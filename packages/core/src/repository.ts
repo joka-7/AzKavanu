@@ -8,6 +8,7 @@ import {
   progressDocName,
   progressKey,
   trackSchema,
+  type Membership,
   type ProgressRecord,
   type StudyTrack,
 } from './model';
@@ -90,6 +91,11 @@ export class Repository {
     return (this.docs.get('manifest')?.records[key] as { value: T } | undefined)?.value;
   }
 
+  /** Group memberships keyed by group id, including ones the user has left. */
+  memberships(): Record<string, Membership> {
+    return (this.docs.get('groups')?.records ?? {}) as Record<string, Membership>;
+  }
+
   // ---- writes ------------------------------------------------------------
 
   async saveTrack(input: TrackInput): Promise<StudyTrack> {
@@ -119,6 +125,10 @@ export class Repository {
 
   async setSetting(key: string, value: unknown): Promise<void> {
     await this.put('settings', key, { value, hlc: this.clock.tick() });
+  }
+
+  async saveMembership(groupId: string, m: Omit<Membership, 'hlc'>): Promise<void> {
+    await this.put('groups', groupId, { ...m, hlc: this.clock.tick() });
   }
 
   async setManifestValue(key: string, value: unknown): Promise<void> {

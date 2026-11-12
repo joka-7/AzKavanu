@@ -2,7 +2,9 @@
  * Google Identity Services token model. A browser-only app cannot hold a
  * refresh token, so access tokens last about an hour and are kept in memory.
  */
-export const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
+/** `drive.appdata`: the hidden per-app folder. `drive.file`: only files this app created or the user picked (group files). */
+export const DRIVE_SCOPES =
+  'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file';
 
 interface TokenResponse {
   access_token?: string;

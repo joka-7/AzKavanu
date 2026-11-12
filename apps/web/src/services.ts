@@ -1,7 +1,16 @@
-import { Repository, SyncEngine, planReminders, type LocalStorePort, type SyncReport } from '@kavanu/core';
-import { MemoryStore } from '@kavanu/core';
+import {
+  GroupManager,
+  MemoryStore,
+  Repository,
+  SyncEngine,
+  planReminders,
+  toISODate,
+  type LocalStorePort,
+  type SyncReport,
+} from '@kavanu/core';
 import { AuthRequiredError, GoogleAuth } from './platform/googleAuth';
 import { GoogleDrive } from './platform/googleDrive';
+import { GoogleGroupFiles } from './platform/googleGroupFiles';
 import { IdbStore } from './platform/idbStore';
 import { WebNotifier } from './platform/notifications';
 
@@ -27,6 +36,11 @@ export class SyncController {
   private auth: GoogleAuth | null = null;
   private drive: GoogleDrive | null = null;
   private engine: SyncEngine | null = null;
+  /** Present only when a Google client ID is configured. */
+  groups: GroupManager | null = null;
+  groupFiles: GoogleGroupFiles | null = null;
+  /** Drive permission id of the connected account, once known. */
+  accountId: string | null = null;
   private debounce: number | undefined;
   private lastRevisionSynced = -1;
 
@@ -42,6 +56,8 @@ export class SyncController {
     this.auth = new GoogleAuth(clientId);
     this.drive = new GoogleDrive(() => this.auth!.getAccessToken(false));
     this.engine = new SyncEngine(repo, this.drive, store);
+    this.groupFiles = new GoogleGroupFiles(() => this.auth!.getAccessToken(false));
+    this.groups = new GroupManager(repo, store, this.groupFiles, () => toISODate(new Date()));
     this.status = { state: localStorage.getItem(CONNECTED_FLAG) ? 'needsReconnect' : 'disconnected' };
 
     repo.subscribe(() => this.schedule());
@@ -95,9 +111,11 @@ export class SyncController {
       const bound = await this.store.get<string>(ACCOUNT_KEY);
       if (bound && bound !== account) return this.set({ state: 'accountMismatch' });
       if (!bound) await this.store.set(ACCOUNT_KEY, account);
+      this.accountId = account;
 
       const revision = this.repo.getRevision();
       const report = await this.engine.sync();
+      await this.groups?.sync();
       this.lastRevisionSynced = report.pulled.length ? this.repo.getRevision() : revision;
       this.set({ state: 'synced', at: Date.now(), report });
       if (this.repo.getRevision() !== this.lastRevisionSynced) this.schedule();
@@ -109,6 +127,12 @@ export class SyncController {
         this.set({ state: 'error', message: err instanceof Error ? err.message : String(err) });
       }
     }
+  }
+
+  /** A current access token, for Google UI components such as the Picker. */
+  token(): Promise<string> {
+    if (!this.auth) throw new Error('Google Drive is not configured');
+    return this.auth.getAccessToken(false);
   }
 
   private schedule(): void {
@@ -165,6 +189,7 @@ export async function createServices(): Promise<Services> {
   replanReminders();
 
   const sync = new SyncController(repo, store, import.meta.env.VITE_GOOGLE_CLIENT_ID || undefined);
+  await sync.groups?.load();
   void sync.resume();
 
   return { repo, sync, notifier, replanReminders };

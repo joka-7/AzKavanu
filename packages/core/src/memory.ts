@@ -45,3 +45,30 @@ export class MemoryDrive implements DrivePort {
     this.files.delete(id);
   }
 }
+
+export class MemoryGroupFiles {
+  files = new Map<string, { version: number; content: unknown }>();
+  private nextId = 1;
+  async create(_name: string, content: unknown) {
+    const id = `g${this.nextId++}`;
+    this.files.set(id, { version: 1, content: structuredClone(content) });
+    return { id, version: '1' };
+  }
+  private file(id: string) {
+    const f = this.files.get(id);
+    if (!f) throw new Error('File not found or access revoked');
+    return f;
+  }
+  async version(id: string) {
+    return String(this.file(id).version);
+  }
+  async download(id: string) {
+    return structuredClone(this.file(id).content);
+  }
+  async update(id: string, content: unknown) {
+    const f = this.file(id);
+    f.version += 1;
+    f.content = structuredClone(content);
+    return { version: String(f.version) };
+  }
+}

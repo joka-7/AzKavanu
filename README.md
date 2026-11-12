@@ -14,8 +14,9 @@ Implemented (architecture phases 1a and 1b):
 - Local-first storage in IndexedDB, installable as a PWA, English and Hebrew (RTL)
 - Google Drive sync into the hidden app-data folder, with per-record merge between devices
 - Reminders while the app is open
+- Study groups: one shared Drive file per group, invitations by email, a seven-day view of each member's progress
 
-Not yet implemented: study groups, the Google Calendar reminder mirror, the Android and desktop shells.
+Not yet implemented: the Google Calendar reminder mirror, signed group sections, the Android and desktop shells.
 
 ## Layout
 
@@ -39,8 +40,12 @@ npm run build      # static site in apps/web/dist
 Without configuration the app runs in local-only mode. To enable sync:
 
 1. In Google Cloud Console, create a project and enable the **Google Drive API**.
-2. Configure the OAuth consent screen with the scope `https://www.googleapis.com/auth/drive.appdata`.
+2. Configure the OAuth consent screen with the scopes `https://www.googleapis.com/auth/drive.appdata` and `https://www.googleapis.com/auth/drive.file`.
 3. Create an OAuth client ID of type **Web application** and add your origins (for example `http://localhost:5173`) under *Authorized JavaScript origins*.
 4. Copy `apps/web/.env.example` to `apps/web/.env.local` and set `VITE_GOOGLE_CLIENT_ID`.
 
-The sync logic is covered by unit tests and by a browser test against a simulated Drive API; it has not yet been run against a real Google account.
+Joining a group that someone else created also needs the Google Picker, so that the user can grant the app access to that one shared file:
+
+5. Enable the **Google Picker API**, create an API key restricted to it, and set `VITE_GOOGLE_API_KEY` and `VITE_GOOGLE_APP_ID` (the Cloud project number).
+
+The sync and group logic is covered by unit tests and by a browser test against a simulated Drive API; none of it has yet been run against a real Google account, and the Picker step of joining a group is not exercised by any test.

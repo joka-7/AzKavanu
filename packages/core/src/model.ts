@@ -76,6 +76,54 @@ export type SettingRecord = z.infer<typeof settingSchema>;
 export const manifestRecordSchema = z.object({ value: z.unknown(), hlc });
 export type ManifestRecord = z.infer<typeof manifestRecordSchema>;
 
+export const membershipSchema = z.object({
+  driveFileId: z.string().min(1),
+  /** This user's id inside the group file; the same on all of their devices. */
+  memberId: z.string().min(1),
+  role: z.enum(['owner', 'member']),
+  /** The local track whose progress is published to the group. */
+  trackId: z.string().min(1),
+  left: z.boolean(),
+  hlc,
+});
+export type Membership = z.infer<typeof membershipSchema>;
+
+/** The track a group studies together, copied into the shared file so joiners can adopt it. */
+export const trackTemplateSchema = z.object({
+  title: z.string().min(1).max(120),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  schedule: scheduleSchema,
+  link: linkSchema,
+});
+export type TrackTemplate = z.infer<typeof trackTemplateSchema>;
+
+export const groupRecordSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('meta'), id: z.string().min(1), name: z.string().min(1).max(80), track: trackTemplateSchema, hlc }),
+  z.object({
+    kind: z.literal('member'),
+    displayName: z.string().min(1).max(60),
+    /** Dates (within a bounded recent window) on which the member completed the group's track. */
+    recent: z.record(isoDate, z.literal(true)).refine((r) => Object.keys(r).length <= 400),
+    left: z.boolean(),
+    hlc,
+  }),
+]);
+export type GroupRecord = z.infer<typeof groupRecordSchema>;
+export type GroupMeta = Extract<GroupRecord, { kind: 'meta' }>;
+export type GroupMember = Extract<GroupRecord, { kind: 'member' }>;
+
+const groupDocSchema = z.object({
+  schemaVersion: z.number().int().min(1),
+  records: z.record(z.string().max(80), groupRecordSchema).refine((r) => Object.keys(r).length <= 201),
+});
+
+/** Validate a shared group file. Its content is written by other people and is never trusted. */
+export function parseGroupDoc(raw: unknown): RecordDoc<GroupRecord> {
+  const version = (raw as { schemaVersion?: unknown } | null)?.schemaVersion;
+  if (typeof version === 'number' && version > SCHEMA_VERSION) throw new SchemaTooNewError('group', version);
+  return groupDocSchema.parse(raw);
+}
+
 function docSchema<T extends z.ZodTypeAny>(record: T) {
   return z.object({ schemaVersion: z.number().int().min(1), records: z.record(z.string(), record) });
 }
@@ -85,13 +133,14 @@ const schemas = {
   settings: docSchema(settingSchema),
   tracks: docSchema(trackSchema),
   progress: docSchema(progressSchema),
+  groups: docSchema(membershipSchema),
 };
 
 export type DocKind = keyof typeof schemas;
 
 /** Document names are also the Drive file names (plus `.json`). */
 export function docKind(name: string): DocKind | null {
-  if (name === 'manifest' || name === 'settings' || name === 'tracks') return name;
+  if (name === 'manifest' || name === 'settings' || name === 'tracks' || name === 'groups') return name;
   if (/^progress-\d{4}$/.test(name)) return 'progress';
   return null;
 }

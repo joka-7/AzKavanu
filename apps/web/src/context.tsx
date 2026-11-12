@@ -27,3 +27,14 @@ export function useLocale(): { locale: Locale; t: (typeof strings)['en'] } {
   const locale = repo.setting<Locale>('locale', defaultLocale());
   return { locale, t: strings[locale] ?? strings.en };
 }
+
+const noSubscribe = () => () => {};
+const zero = () => 0;
+
+/** The group manager (null when Drive is not configured); re-renders on group changes. */
+export function useGroups() {
+  const { sync } = useServices();
+  useRepo();
+  useSyncExternalStore(sync.groups?.subscribe ?? noSubscribe, sync.groups?.getRevision ?? zero);
+  return sync.groups;
+}
