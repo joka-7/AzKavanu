@@ -1,19 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocale, useRepo, useServices, useSyncStatus } from '../context';
 import type { Locale } from '../i18n';
-import { WebNotifier } from '../platform/notifications';
+import { isNative, type NotifPermission } from '../platform/notifications';
 
 export function SettingsView() {
   const repo = useRepo();
-  const { sync, replanReminders } = useServices();
+  const { sync, notifier, replanReminders } = useServices();
   const status = useSyncStatus();
   const { locale, t } = useLocale();
-  const [permission, setPermission] = useState(WebNotifier.permission);
+  const [permission, setPermission] = useState<NotifPermission>('default');
+  useEffect(() => {
+    void notifier.permission().then(setPermission);
+  }, [notifier]);
 
   const message = (() => {
     switch (status.state) {
       case 'unconfigured':
-        return t.driveUnconfigured;
+        return isNative ? t.driveNativePending : t.driveUnconfigured;
       case 'disconnected':
         return t.driveDisconnected;
       case 'needsReconnect':
@@ -49,9 +52,9 @@ export function SettingsView() {
   };
 
   const notifText = {
-    granted: t.notifGranted,
-    default: t.notifDefault,
-    denied: t.notifDenied,
+    granted: notifier.background ? t.notifGrantedNative : t.notifGranted,
+    default: notifier.background ? t.notifDefaultNative : t.notifDefault,
+    denied: notifier.background ? t.notifDeniedNative : t.notifDenied,
     unsupported: t.notifUnsupported,
   }[permission];
 
@@ -97,7 +100,7 @@ export function SettingsView() {
           <button
             className="btn primary"
             onClick={async () => {
-              setPermission(await WebNotifier.requestPermission());
+              setPermission(await notifier.requestPermission());
               replanReminders();
             }}
           >

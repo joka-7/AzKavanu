@@ -12,7 +12,7 @@ import { AuthRequiredError, GoogleAuth } from './platform/googleAuth';
 import { GoogleDrive } from './platform/googleDrive';
 import { GoogleGroupFiles } from './platform/googleGroupFiles';
 import { IdbStore } from './platform/idbStore';
-import { WebNotifier } from './platform/notifications';
+import { createNotifier, isNative, type Notifier } from './platform/notifications';
 
 export type SyncStatus =
   | { state: 'unconfigured' }
@@ -150,7 +150,7 @@ export class SyncController {
 export interface Services {
   repo: Repository;
   sync: SyncController;
-  notifier: WebNotifier;
+  notifier: Notifier;
   replanReminders(): void;
 }
 
@@ -179,16 +179,31 @@ export async function createServices(): Promise<Services> {
     await repo.setManifestValue(`device:${id}`, { platform: 'web', label: navigator.userAgent.slice(0, 120) });
   }
 
-  const notifier = new WebNotifier();
-  const replanReminders = () =>
-    notifier.reconcile(
-      planReminders(repo.tracks(), repo.isDone, new Date(), { windowDays: 2, locale: repo.setting('locale', 'en') }),
-    );
+  const notifier = createNotifier();
+  let replanTimer: number | undefined;
+  const replanReminders = () => {
+    // Coalesce bursts of changes into one pass over the OS scheduler.
+    clearTimeout(replanTimer);
+    replanTimer = window.setTimeout(() => {
+      void notifier.reconcile(
+        planReminders(repo.tracks(), repo.isDone, new Date(), {
+          windowDays: notifier.windowDays,
+          locale: repo.setting('locale', 'en'),
+        }),
+      );
+    }, 250);
+  };
   repo.subscribe(replanReminders);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') replanReminders();
+  });
   window.setInterval(replanReminders, 60 * 60_000);
   replanReminders();
 
-  const sync = new SyncController(repo, store, import.meta.env.VITE_GOOGLE_CLIENT_ID || undefined);
+  // Google blocks its browser sign-in inside an embedded web view, so the Android
+  // build stays local-only until native Google authorization is added.
+  const clientId = isNative ? undefined : import.meta.env.VITE_GOOGLE_CLIENT_ID || undefined;
+  const sync = new SyncController(repo, store, clientId);
   await sync.groups?.load();
   void sync.resume();
 
