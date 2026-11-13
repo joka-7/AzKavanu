@@ -1,0 +1,11 @@
+{
+  "name": "kavanu",
+  "private": true,
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev": "npm run dev -w @kavanu/web",
+    "build": "npm run build -w @kavanu/web",
+    "test": "npm run test -w @kavanu/core",
+    "typecheck": "npm run typecheck -w @kavanu/core && npm run typecheck -w @kavanu/web"
+  }
+}
