@@ -55,7 +55,7 @@ export function planReminders(
           fireAt,
           title: track.title,
           body: (he && session.labelHe) || session.label,
-          url: resolveLink(track, session),
+          url: resolveLink(track, session, opts.locale),
           trackId: track.id,
           date,
         });

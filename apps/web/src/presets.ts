@@ -23,7 +23,29 @@ export interface Preset {
 
 const cycle = (c: FixedCycle, extra: Partial<Preset> = {}): Preset => ({ key: c, cycle: c, material: 'cycle', when: 'daily', ...extra });
 
-export const PRESET_GROUPS: { title: (t: T) => string; presets: Preset[] }[] = [
+interface PresetGroup {
+  title: (t: T) => string;
+  presets: Preset[];
+}
+
+/** Top-level fields. A category with `groups` shows them as tabs so only one list is visible at a time. */
+export interface Category {
+  key: string;
+  title: (t: T) => string;
+  groups?: PresetGroup[];
+  presets?: Preset[];
+}
+
+const named = (key: string, label: (t: T) => string, extra: Partial<Preset> = {}): Preset => ({
+  key,
+  label,
+  material: 'none',
+  when: 'perWeek',
+  times: 2,
+  ...extra,
+});
+
+const JUDAISM: PresetGroup[] = [
   {
     title: (t) => t.catTalmud,
     presets: [
@@ -75,28 +97,48 @@ export const PRESET_GROUPS: { title: (t: T) => string; presets: Preset[] }[] = [
   },
   {
     title: (t) => t.catTanakh,
-    presets: [
-      cycle('parasha', { when: 'perWeek', times: 1 }),
-      cycle('nachYomi'),
-      cycle('929'),
-      cycle('tanakhYomi'),
-      cycle('psalms'),
-    ],
+    presets: [cycle('parasha', { when: 'perWeek', times: 1 }), cycle('nachYomi'), cycle('929'), cycle('tanakhYomi'), cycle('psalms')],
   },
   {
     title: (t) => t.catMussar,
     presets: [cycle('chofetzChaim'), cycle('shemiratHaLashon'), cycle('tanyaYomi')],
   },
+];
+
+export const CATEGORIES: Category[] = [
+  { key: 'judaism', title: (t) => t.catJudaism, groups: JUDAISM },
   {
-    title: (t) => t.catGeneral,
+    key: 'languages',
+    title: (t) => t.catLanguages,
     presets: [
-      { key: 'language', label: (t) => t.pLanguage, material: 'none', when: 'perWeek', times: 3 },
-      { key: 'exam', label: (t) => t.pExam, material: 'units', when: 'weekly', daysOfWeek: [0, 1, 2, 3, 4], unitLabel: (t) => t.unitTopic },
-      { key: 'book', label: (t) => t.pBook, material: 'units', when: 'perWeek', times: 2, unitLabel: (t) => t.unitChapter },
-      { key: 'talk', label: (t) => t.pTalk, material: 'none', when: 'perWeek', times: 1 },
-      { key: 'custom', label: (t) => t.pCustom, material: 'none', when: 'daily' },
+      named('english', (t) => t.pEnglish, { times: 3 }),
+      named('hebrew', (t) => t.pHebrew, { times: 3 }),
+      named('arabic', (t) => t.pArabic, { times: 3 }),
+      named('spanish', (t) => t.pSpanish, { times: 3 }),
+      named('french', (t) => t.pFrench, { times: 3 }),
+      named('language', (t) => t.pOtherLanguage, { times: 3 }),
     ],
   },
+  {
+    key: 'studies',
+    title: (t) => t.catStudies,
+    presets: [
+      named('exam', (t) => t.pExam, { material: 'units', when: 'weekly', daysOfWeek: [0, 1, 2, 3, 4], unitLabel: (t) => t.unitTopic }),
+      named('course', (t) => t.pCourse, { material: 'units', unitLabel: (t) => t.unitLesson }),
+      named('homework', (t) => t.pHomework, { when: 'weekly', daysOfWeek: [0, 1, 2, 3, 4] }),
+    ],
+  },
+  {
+    key: 'reading',
+    title: (t) => t.catReading,
+    presets: [named('book', (t) => t.pBook, { material: 'units', unitLabel: (t) => t.unitChapter })],
+  },
+  {
+    key: 'meetings',
+    title: (t) => t.catMeetings,
+    presets: [named('talk', (t) => t.pTalk, { times: 1 }), named('chavruta', (t) => t.pChavruta, { times: 1 })],
+  },
+  { key: 'other', title: (t) => t.catOther, presets: [named('custom', (t) => t.pCustom, { when: 'daily' })] },
 ];
 
 export function curriculumOf(material: Material): CurriculumId {

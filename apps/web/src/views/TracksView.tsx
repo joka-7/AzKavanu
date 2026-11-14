@@ -13,9 +13,12 @@ import { gematriya } from '@hebcal/core';
 import { useState } from 'react';
 import { useLocale, useRepo } from '../context';
 import { describeSchedule, weekdayNames } from '../describe';
-import { PRESET_GROUPS, curriculumOf, type Material, type Preset, type When } from '../presets';
+import { CATEGORIES, curriculumOf, type Category, type Material, type Preset, type When } from '../presets';
 
 const COLORS = ['#27408b', '#1f7a5c', '#b4532a', '#7a3e9d', '#a8324a', '#2f6f8f', '#8a6d1a', '#4a5560'];
+
+/** Id of the reminder that is tied to the session's start time. */
+const AT_START = 'at-start';
 
 interface Draft {
   id?: string;
@@ -41,6 +44,11 @@ interface Draft {
   builtinLink: boolean;
   urlTemplate: string;
   notes: string;
+  timed: boolean;
+  timeStart: string;
+  timeEnd: string;
+  remindAtStart: boolean;
+  extraLinks: { label: string; urlTemplate: string }[];
   reminders: ReminderRule[];
 }
 
@@ -67,6 +75,11 @@ function blankDraft(count: number): Draft {
     builtinLink: true,
     urlTemplate: '',
     notes: '',
+    timed: false,
+    timeStart: '20:00',
+    timeEnd: '',
+    remindAtStart: true,
+    extraLinks: [],
     reminders: [],
   };
 }
@@ -76,7 +89,14 @@ function toDraft(t: StudyTrack): Draft {
   d.id = t.id;
   d.title = t.title;
   d.color = t.color;
-  d.reminders = t.reminders;
+  d.reminders = t.reminders.filter((r) => r.id !== AT_START);
+  d.timed = !!t.time;
+  if (t.time) {
+    d.timeStart = t.time.start;
+    d.timeEnd = t.time.end ?? '';
+    d.remindAtStart = t.reminders.some((r) => r.id === AT_START);
+  }
+  d.extraLinks = t.extraLinks ?? [];
   d.notes = t.notes ?? '';
   d.builtinLink = t.link.provider === 'builtin';
   d.urlTemplate = t.link.provider === 'template' ? t.link.urlTemplate : '';
@@ -145,6 +165,9 @@ function toInput(d: Draft): TrackInput {
   const flexible = recurrence.type === 'flexible';
   const template = d.urlTemplate.trim();
   const hasBuiltin = d.material === 'cycle' || d.material === 'talmud' || d.material === 'mishnah';
+  const extra = d.extraLinks
+    .map((l) => ({ label: l.label.trim(), urlTemplate: l.urlTemplate.trim() }))
+    .filter((l) => l.label && l.urlTemplate);
 
   let schedule: TrackInput['schedule'];
   if (d.material === 'cycle') {
@@ -178,8 +201,13 @@ function toInput(d: Draft): TrackInput {
     title: d.title.trim() || d.defaultTitle,
     color: d.color,
     archived: false,
-    reminders: d.reminders,
+    reminders: [
+      ...(d.timed && d.remindAtStart ? [{ id: AT_START, time: d.timeStart, onlyIfNotDone: true }] : []),
+      ...d.reminders,
+    ],
     ...(d.notes.trim() ? { notes: d.notes.trim() } : {}),
+    ...(d.timed ? { time: { start: d.timeStart, ...(d.timeEnd ? { end: d.timeEnd } : {}) } } : {}),
+    ...(extra.length ? { extraLinks: extra } : {}),
     schedule,
     link: hasBuiltin
       ? d.builtinLink
@@ -196,6 +224,8 @@ export function TracksView() {
   const { locale, t, cycles } = useLocale();
   const tracks = repo.tracks();
   const [picking, setPicking] = useState(false);
+  const [category, setCategory] = useState<Category | null>(null);
+  const [groupIndex, setGroupIndex] = useState(0);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const dayNames = weekdayNames(locale);
@@ -205,7 +235,7 @@ export function TracksView() {
   const startFrom = (p: Preset) => {
     const d = blankDraft(tracks.length);
     d.material = p.material;
-    d.defaultTitle = p.cycle ? cycles[p.cycle] : p.key === 'custom' ? '' : p.label!(t);
+    d.defaultTitle = p.cycle ? cycles[p.cycle] : p.key === 'custom' || p.key === 'language' ? '' : p.label!(t);
     if (p.cycle) d.cycle = p.cycle;
     if (p.when) d.when = p.when;
     if (p.times) d.times = String(p.times);
@@ -217,6 +247,7 @@ export function TracksView() {
     if (curriculum) d.section = curriculum.sections[0]!.name;
     setDraft(d);
     setPicking(false);
+    setCategory(null);
   };
 
   const save = async () => {
@@ -239,26 +270,70 @@ export function TracksView() {
   };
 
   if (picking) {
+    const closePicker = () => {
+      setPicking(false);
+      setCategory(null);
+    };
+    const presets = category?.groups ? category.groups[groupIndex]!.presets : (category?.presets ?? []);
     return (
       <section className="card">
         <div className="list-head">
-          <h2>{t.chooseWhat}</h2>
-          <button className="btn" onClick={() => setPicking(false)}>
-            {t.cancel}
-          </button>
+          <h2>{category ? category.title(t) : t.chooseCategory}</h2>
+          <div className="month-nav">
+            {category && (
+              <button className="btn" onClick={() => setCategory(null)}>
+                {t.back}
+              </button>
+            )}
+            <button className="btn" onClick={closePicker}>
+              {t.cancel}
+            </button>
+          </div>
         </div>
-        {PRESET_GROUPS.map((g) => (
-          <div key={g.title(t)} className="preset-group">
-            <h3>{g.title(t)}</h3>
+        {!category ? (
+          <div className="categories">
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.key}
+                className="category"
+                onClick={() => {
+                  // A field with a single choice needs no second screen.
+                  if (!c.groups && c.presets?.length === 1) return startFrom(c.presets[0]!);
+                  setGroupIndex(0);
+                  setCategory(c);
+                }}
+              >
+                {c.title(t)}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <>
+            {category.groups && (
+              <div className="subtabs" role="tablist">
+                {category.groups.map((g, i) => (
+                  <button
+                    key={i}
+                    role="tab"
+                    className="tab"
+                    aria-selected={i === groupIndex}
+                    aria-current={i === groupIndex ? 'page' : undefined}
+                    onClick={() => setGroupIndex(i)}
+                  >
+                    {g.title(t)}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="presets">
-              {g.presets.map((p) => (
+              {presets.map((p) => (
                 <button key={p.key} className="preset" onClick={() => startFrom(p)}>
                   {p.cycle ? cycles[p.cycle] : p.label!(t)}
                 </button>
               ))}
             </div>
-          </div>
-        ))}
+          </>
+        )}
       </section>
     );
   }
@@ -472,6 +547,32 @@ export function TracksView() {
           </label>
         )}
 
+        <label className="field">
+          <span>{t.timeOfDay}</span>
+          <select value={draft.timed ? 'fixed' : 'any'} onChange={(e) => set({ timed: e.target.value === 'fixed' })}>
+            <option value="any">{t.timeAny}</option>
+            <option value="fixed">{t.timeFixed}</option>
+          </select>
+        </label>
+        {draft.timed && (
+          <>
+            <div className="row times">
+              <label className="field">
+                <span>{t.timeFrom}</span>
+                <input type="time" required value={draft.timeStart} onChange={(e) => set({ timeStart: e.target.value })} />
+              </label>
+              <label className="field">
+                <span>{t.timeTo}</span>
+                <input type="time" value={draft.timeEnd} onChange={(e) => set({ timeEnd: e.target.value })} />
+              </label>
+            </div>
+            <label className="choice">
+              <input type="checkbox" checked={draft.remindAtStart} onChange={(e) => set({ remindAtStart: e.target.checked })} />{' '}
+              {t.remindAtStart}
+            </label>
+          </>
+        )}
+
         {sequential && !flexible && (
           <fieldset className="field">
             <legend>{t.pacing}</legend>
@@ -508,6 +609,40 @@ export function TracksView() {
             </small>
           </label>
         )}
+
+        <fieldset className="field">
+          <legend>{t.extraLinks}</legend>
+          {draft.extraLinks.map((l, i) => (
+            <div className="extra-link" key={i}>
+              <input
+                value={l.label}
+                maxLength={40}
+                placeholder={t.linkName}
+                aria-label={t.linkName}
+                onChange={(e) => set({ extraLinks: draft.extraLinks.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })}
+              />
+              <input
+                type="url"
+                dir="ltr"
+                value={l.urlTemplate}
+                placeholder="https://"
+                aria-label={t.linkUrl}
+                onChange={(e) =>
+                  set({ extraLinks: draft.extraLinks.map((x, j) => (j === i ? { ...x, urlTemplate: e.target.value } : x)) })
+                }
+              />
+              <button type="button" className="btn" onClick={() => set({ extraLinks: draft.extraLinks.filter((_, j) => j !== i) })}>
+                {t.remove}
+              </button>
+            </div>
+          ))}
+          {draft.extraLinks.length < 5 && (
+            <button type="button" className="btn" onClick={() => set({ extraLinks: [...draft.extraLinks, { label: '', urlTemplate: '' }] })}>
+              {t.addLink}
+            </button>
+          )}
+          <small className="muted">{t.extraLinksHint}</small>
+        </fieldset>
 
         <label className="field">
           <span>{t.notes}</span>
