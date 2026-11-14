@@ -122,6 +122,40 @@ export function SettingsView() {
       </section>
 
       <section className="card">
+        <h2>{t.calendarKind}</h2>
+        <div className="choices">
+          {(['hebrew', 'gregorian'] as const).map((kind) => (
+            <label key={kind}>
+              <input
+                type="radio"
+                name="calendar"
+                checked={repo.setting('calendar', locale === 'he' ? 'hebrew' : 'gregorian') === kind}
+                onChange={() => void repo.setSetting('calendar', kind)}
+              />{' '}
+              {kind === 'hebrew' ? t.calHebrew : t.calGregorian}
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>{t.torahCalendar}</h2>
+        <div className="choices">
+          {[true, false].map((il) => (
+            <label key={String(il)}>
+              <input
+                type="radio"
+                name="israel"
+                checked={repo.setting('israel', false) === il}
+                onChange={() => void repo.setSetting('israel', il)}
+              />{' '}
+              {il ? t.israel : t.diaspora}
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="card">
         <h2>{t.data}</h2>
         <div className="actions">
           <button className="btn" onClick={exportData}>

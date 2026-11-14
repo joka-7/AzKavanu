@@ -10,24 +10,63 @@ const timeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 export const recurrenceSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('daily') }),
   z.object({ type: z.literal('weekly'), daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1) }),
+  /** Fixed days of the calendar month; a day the month lacks (e.g. the 31st) is skipped. */
+  z.object({
+    type: z.literal('monthly'),
+    daysOfMonth: z.array(z.number().int().min(1).max(31)).min(1),
+    /** Which calendar's month the days refer to. */
+    calendar: z.enum(['gregorian', 'hebrew']).default('gregorian'),
+  }),
+  /** No fixed days: a target number of sessions per week or month, done whenever the learner chooses. */
+  z.object({ type: z.literal('flexible'), times: z.number().int().min(1).max(31), per: z.enum(['week', 'month']) }),
 ]);
 export type Recurrence = z.infer<typeof recurrenceSchema>;
 
-export const FIXED_CYCLES = ['dafYomi', 'mishnaYomi'] as const;
+/** Established cycles in which the material for a date is fixed world-wide. */
+export const FIXED_CYCLES = [
+  'dafYomi',
+  'dafWeekly',
+  'dirshuAmudYomi',
+  'yerushalmi-vilna',
+  'mishnaYomi',
+  'perekYomi',
+  'rambam1',
+  'rambam3',
+  'seferHaMitzvot',
+  'dirshuDafHalacha',
+  'kitzurShulchanAruch',
+  'arukhHaShulchanYomi',
+  'chofetzChaim',
+  'shemiratHaLashon',
+  'parasha',
+  'nachYomi',
+  'tanakhYomi',
+  '929',
+  'psalms',
+  'tanyaYomi',
+] as const;
 export type FixedCycle = (typeof FIXED_CYCLES)[number];
 
+/** Ordered texts a learner can walk through at their own pace. `custom` is plain numbered units. */
+export const CURRICULA = ['custom', 'talmud', 'mishnah'] as const;
+export type CurriculumId = (typeof CURRICULA)[number];
+
 export const scheduleSchema = z.discriminatedUnion('kind', [
-  /** The unit for a date is a pure function of the date (world-wide cycles). */
-  z.object({ kind: z.literal('fixedCycle'), cycle: z.enum(FIXED_CYCLES) }),
-  /** Walks numbered units from a start point at N units per session. */
+  /** The unit for a date is a pure function of the date; recurrence only chooses which days to show it. */
+  z.object({ kind: z.literal('fixedCycle'), cycle: z.enum(FIXED_CYCLES), recurrence: recurrenceSchema.optional() }),
+  /** Walks an ordered curriculum from a start point at N units per session. */
   z.object({
     kind: z.literal('sequential'),
     startDate: isoDate,
+    curriculum: z.enum(CURRICULA).default('custom'),
     unitLabel: z.string().max(40),
     startUnit: z.number().int().min(1),
     unitsPerSession: z.number().int().min(1).max(100),
+    /** Number of the last unit to study (inclusive). */
     totalUnits: z.number().int().min(1).optional(),
     recurrence: recurrenceSchema,
+    /** `calendar`: a missed day is skipped. `completion`: the next session continues where the last finished. */
+    advance: z.enum(['calendar', 'completion']).default('calendar'),
   }),
   /** Recurrence only; sessions are simply numbered. */
   z.object({ kind: z.literal('freeform'), startDate: isoDate, recurrence: recurrenceSchema }),
@@ -56,11 +95,14 @@ export const trackSchema = z.object({
   schedule: scheduleSchema,
   link: linkSchema,
   reminders: z.array(reminderRuleSchema).max(10),
+  notes: z.string().max(500).optional(),
   archived: z.boolean(),
   deleted: z.boolean(),
   hlc,
 });
 export type StudyTrack = z.infer<typeof trackSchema>;
+/** A track as written by callers: fields with defaults may be omitted. */
+export type StudyTrackInput = z.input<typeof trackSchema>;
 
 export const progressSchema = z.object({
   done: z.boolean(),
@@ -98,7 +140,16 @@ export const trackTemplateSchema = z.object({
 export type TrackTemplate = z.infer<typeof trackTemplateSchema>;
 
 export const groupRecordSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('meta'), id: z.string().min(1), name: z.string().min(1).max(80), track: trackTemplateSchema, hlc }),
+  z.object({
+    kind: z.literal('meta'),
+    id: z.string().min(1),
+    name: z.string().min(1).max(80),
+    description: z.string().max(300).optional(),
+    /** Chosen by the owner; clients refuse to join a full group. */
+    maxMembers: z.number().int().min(2).max(100).optional(),
+    track: trackTemplateSchema,
+    hlc,
+  }),
   z.object({
     kind: z.literal('member'),
     displayName: z.string().min(1).max(60),

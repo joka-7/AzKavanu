@@ -1,7 +1,7 @@
 import { addDays, toISODate, toLocalDate } from './dates';
 import { resolveLink } from './links';
-import { progressKey, type ProgressRecord, type StudyTrack } from './model';
-import { sessionOn } from './schedule';
+import type { StudyTrack } from './model';
+import { isDoneOn, periodProgress, sessionOn, type ScheduleContext } from './schedule';
 
 export interface DesiredNotification {
   /** Stable across re-planning, so platform schedulers can diff. */
@@ -25,7 +25,7 @@ export interface PlanOptions {
  */
 export function planReminders(
   tracks: Iterable<StudyTrack>,
-  isDone: (trackId: string, date: string) => boolean,
+  contextFor: (trackId: string) => ScheduleContext,
   now: Date,
   opts: PlanOptions = {},
 ): DesiredNotification[] {
@@ -36,11 +36,15 @@ export function planReminders(
 
   for (const track of tracks) {
     if (track.deleted || track.archived || track.reminders.length === 0) continue;
+    const ctx = contextFor(track.id);
     for (let i = 0; i < windowDays; i++) {
       const date = addDays(today, i);
-      const session = sessionOn(track, date);
+      const session = sessionOn(track, date, ctx);
       if (!session) continue;
-      const done = isDone(track.id, date);
+      // A flexible track stops nudging once the week's or month's target is met.
+      const quota = periodProgress(track.schedule, date, ctx.doneDates);
+      if (quota && quota.done >= quota.target) continue;
+      const done = isDoneOn(ctx.doneDates, date);
       for (const rule of track.reminders) {
         if (rule.onlyIfNotDone && done) continue;
         const [h, m] = rule.time.split(':').map(Number);
@@ -59,8 +63,4 @@ export function planReminders(
     }
   }
   return out.sort((a, b) => a.fireAt - b.fireAt);
-}
-
-export function isDoneIn(records: Record<string, ProgressRecord>) {
-  return (trackId: string, date: string) => records[progressKey(trackId, date)]?.done === true;
 }

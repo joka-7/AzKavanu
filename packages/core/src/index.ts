@@ -2,6 +2,7 @@ export * from './dates';
 export * from './hlc';
 export * from './crdt';
 export * from './model';
+export * from './curricula';
 export * from './schedule';
 export * from './links';
 export * from './reminders';

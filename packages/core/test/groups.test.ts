@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GroupManager, formatHlc, MemoryGroupFiles, MemoryStore, Repository, type TrackInput } from '../src';
+import { GroupFullError, GroupManager, formatHlc, MemoryGroupFiles, MemoryStore, Repository, type TrackInput } from '../src';
 
 const TODAY = '2026-11-12';
 const daf: TrackInput = {
@@ -134,5 +134,36 @@ describe('GroupManager', () => {
     const reopened = new GroupManager(reopenedRepo, dana.store, files, () => TODAY);
     await reopened.load();
     expect(reopened.groups()[0]!.name).toBe('Morning Daf');
+  });
+});
+
+describe('group options', () => {
+  it('carries a description and refuses to exceed the chosen size', async () => {
+    const files = new MemoryGroupFiles();
+    const dana = await user('Dana', files);
+    const track = await dana.repo.saveTrack({
+      ...daf,
+      title: 'Spanish conversation',
+      schedule: { kind: 'freeform', startDate: '2026-11-01', recurrence: { type: 'flexible', times: 2, per: 'week' } },
+      link: { provider: 'none' },
+    });
+    await dana.repo.setDone(track.id, TODAY, true);
+    const id = await dana.groups.createGroup({ name: 'Spanish', displayName: 'Dana', trackId: track.id, description: 'Talk for half an hour', maxMembers: 2 });
+    const fileId = dana.repo.memberships()[id]!.driveFileId;
+
+    const eli = await user('Eli', files);
+    expect(await eli.groups.peek(fileId)).toMatchObject({ description: 'Talk for half an hour', maxMembers: 2, memberCount: 1 });
+    await eli.groups.joinGroup({ fileId, displayName: 'Eli', trackId: null });
+    expect(eli.repo.tracks()[0]!.schedule).toMatchObject({ recurrence: { type: 'flexible', times: 2 } });
+
+    const noa = await user('Noa', files);
+    await expect(noa.groups.joinGroup({ fileId, displayName: 'Noa', trackId: null })).rejects.toBeInstanceOf(GroupFullError);
+    expect(noa.repo.tracks()).toEqual([]);
+
+    // On a flexible track only completed days are marked; other days are neutral, not missed.
+    await dana.groups.sync();
+    const me = dana.groups.groups()[0]!.members[0]!;
+    expect(me.lastDays.at(-1)).toEqual({ date: TODAY, done: true });
+    expect(me.lastDays.at(-2)!.done).toBeNull();
   });
 });
