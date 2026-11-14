@@ -195,6 +195,18 @@ describe('fixed cycles', () => {
     }
   });
 
+  it('leaves no English in the Hebrew labels', () => {
+    for (const cycle of FIXED_CYCLES) {
+      const t: StudyTrack = { ...daf, id: `t_${cycle}`, schedule: { kind: 'fixedCycle', cycle } };
+      for (let i = 0; i < 1200; i++) {
+        for (const d of [addDays('2026-11-10', i)]) {
+          const s = sessionOn(t, d);
+          if (s?.labelHe) expect(s.labelHe, `${cycle} ${d}`).not.toMatch(/[A-Za-z]{2,}/);
+        }
+      }
+    }
+  });
+
   it('gives the parasha of the coming Shabbat and can be limited to chosen days', () => {
     const t: StudyTrack = {
       ...daf,
@@ -233,7 +245,8 @@ describe('own-pace study', () => {
     const m = getCurriculum('mishnah')!;
     expect(m.units).toHaveLength(4192);
     expect(m.sections).toHaveLength(63);
-    expect(m.units[0]).toMatchObject({ section: 'Berakhot', ref: '1:1', sectionHe: 'ברכות' });
+    expect(m.units[0]).toMatchObject({ section: 'Berakhot', ref: '1:1', sectionHe: 'ברכות', refHe: 'א, א' });
+    expect(m.units.find((u) => u.ref === '9:5')?.refHe).toBe('ט, ה');
   });
 
   it('offers the next unit on any day and advances only when a session is completed', () => {

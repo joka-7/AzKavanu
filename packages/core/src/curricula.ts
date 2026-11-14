@@ -1,4 +1,4 @@
-import { HDate } from '@hebcal/core';
+import { HDate, gematriya } from '@hebcal/core';
 import { DafPage, DafYomi, DafYomiEvent, MishnaYomiEvent, MishnaYomiIndex, mishnaYomiStart } from '@hebcal/learning';
 import type { CurriculumId } from './model';
 
@@ -22,6 +22,10 @@ export interface CurriculumSection {
 export interface Curriculum {
   units: CurriculumUnit[];
   sections: CurriculumSection[];
+}
+
+function hebrewNumber(n: number): string {
+  return gematriya(n).replace(/[׳״]/g, '');
 }
 
 function withSections(units: CurriculumUnit[]): Curriculum {
@@ -75,7 +79,8 @@ function buildMishnah(): Curriculum {
         section: m.k,
         sectionHe: he.slice(0, he.lastIndexOf(' ')),
         ref: m.v,
-        refHe: m.v,
+        // Hebrew numerals without the geresh marks, e.g. "א, ב" for chapter 1 mishna 2.
+        refHe: `${hebrewNumber(Number(chapter))}, ${hebrewNumber(Number(mishna))}`,
         url: `https://www.sefaria.org/Mishnah_${m.k.replace(/ /g, '_')}.${chapter}.${mishna}?lang=bi`,
       });
     }

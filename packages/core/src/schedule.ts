@@ -131,6 +131,34 @@ function stripPrefix(cycle: FixedCycle, text: string): string {
   return STRIP_PREFIX.has(cycle) ? text.replace(/^[^:]{1,40}:\s*/, '') : text;
 }
 
+/** The calendar library leaves a few Hebrew renderings partly in English; finish the job. */
+function polishHebrew(cycle: FixedCycle, text: string): string {
+  switch (cycle) {
+    case 'kitzurShulchanAruch':
+      return text.replace(/^Kitzur Shulchan Aru[ck]h\s*/, '');
+    case 'shemiratHaLashon':
+      return text
+        .replace(/^Book II\b/, 'חלק ב')
+        .replace(/^Book I\b/, 'חלק א')
+        .replace(/Footnote_in_/g, 'הערה בסעיף ')
+        .replace(/Footnote/g, 'הערה');
+    case 'seferHaMitzvot':
+      return text
+        .replace(/^Day (\d+)/, 'יום $1')
+        .replace(/Maimonides.? Introduction to Sefer Hamitzvot/g, 'הקדמת הרמב״ם לספר המצוות')
+        .replace(/Positive Commandments?/g, 'מצוות עשה')
+        .replace(/Negative Commandments?/g, 'מצוות לא תעשה')
+        .replace(/Principles?/g, 'שורש')
+        .replace(/Nusach HaTefila/g, 'נוסח התפילה')
+        .replace(/Order of Prayer/g, 'סדר התפילה')
+        .replace(/Text of the Haggadah/g, 'נוסח ההגדה')
+        .replace(/Laws of Megillah and Chanukah Chapters/g, 'הלכות מגילה וחנוכה, פרקים')
+        .replace(/Note About Varying Customs/g, 'הערה על חילופי מנהגים');
+    default:
+      return text;
+  }
+}
+
 function fixedCycleMaterial(cycle: FixedCycle, date: ISODate, israel: boolean): Pick<Session, 'label' | 'labelHe' | 'builtinUrl'> | null {
   const hd = new HDate(toLocalDate(date));
   try {
@@ -145,7 +173,7 @@ function fixedCycleMaterial(cycle: FixedCycle, date: ISODate, israel: boolean): 
     if (!ev) return null;
     return {
       label: stripPrefix(cycle, ev.render('en')),
-      labelHe: stripPrefix(cycle, ev.render('he')),
+      labelHe: polishHebrew(cycle, stripPrefix(cycle, ev.render('he'))),
       builtinUrl: ev.url() ?? undefined,
     };
   } catch {

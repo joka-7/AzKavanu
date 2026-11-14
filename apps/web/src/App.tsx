@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocale, useSyncStatus } from './context';
+import { useLocale, useRepo, useSyncStatus } from './context';
 import { GroupsView } from './views/GroupsView';
 import { CalendarView } from './views/CalendarView';
 import { SettingsView } from './views/SettingsView';
@@ -18,6 +18,7 @@ export function App() {
   const [joinFile, setJoinFile] = useState(joinFileFromHash);
   const [tab, setTab] = useState<Tab>(joinFile ? 'groups' : 'calendar');
   const status = useSyncStatus();
+  const repo = useRepo();
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -66,6 +67,13 @@ export function App() {
             </button>
           ))}
         </nav>
+        <button
+          className="badge"
+          lang={locale === 'he' ? 'en' : 'he'}
+          onClick={() => void repo.setSetting('locale', locale === 'he' ? 'en' : 'he')}
+        >
+          {locale === 'he' ? 'English' : 'עברית'}
+        </button>
         <button className={`badge badge-${badge.tone}`} onClick={() => setTab('settings')}>
           {badge.text}
         </button>
