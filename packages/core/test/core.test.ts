@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   FIXED_CYCLES,
+  resolveExtraLinks,
   HlcClock,
   getCurriculum,
   occurrence,
@@ -342,5 +343,34 @@ describe('Hebrew-month recurrence', () => {
     const indexes = dates.map((d) => sessionOn(t, d)!.sessionIndex);
     expect(indexes).toEqual(indexes.map((_, i) => i + 3));
     expect(dates.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('Hebrew links and extra resources', () => {
+  it('sends Hebrew readers to the Hebrew edition', () => {
+    const s = sessionOn(daf, '2026-11-11')!;
+    expect(resolveLink(daf, s, 'he')).toBe('https://www.sefaria.org.il/Bekhorot.54a?lang=he');
+    expect(resolveLink(daf, s, 'en')).toBe('https://www.sefaria.org/Bekhorot.54a?lang=bi');
+    const parasha: StudyTrack = { ...daf, id: 'p', schedule: { kind: 'fixedCycle', cycle: 'parasha' } };
+    const ps = sessionOn(parasha, '2026-11-12', { israel: true })!;
+    expect(resolveLink(parasha, ps, 'he')).toBe('https://www.sefaria.org.il/Parashat_Toldot?lang=he');
+    expect(resolveLink(parasha, ps, 'en')).toContain('hebcal.com');
+    // A template pointing at Sefaria is localised too; other sites are left alone.
+    const kitzur: StudyTrack = { ...chapters, link: { provider: 'template', urlTemplate: 'https://www.sefaria.org/Kitzur_Shulchan_Arukh.{firstUnit}?lang=bi' } };
+    expect(resolveLink(kitzur, sessionOn(kitzur, '2026-11-01')!, 'he')).toBe('https://www.sefaria.org.il/Kitzur_Shulchan_Arukh.1?lang=he');
+    expect(resolveLink(chapters, sessionOn(chapters, '2026-11-02')!, 'he')).toBe('https://example.org/book/3?d=2026-11-02');
+  });
+
+  it('resolves extra links per day and drops unsafe ones', () => {
+    const t: StudyTrack = {
+      ...daf,
+      extraLinks: [
+        { label: 'Audio', urlTemplate: 'https://example.org/shiur?daf={ref}&d={date}' },
+        { label: 'Bad', urlTemplate: 'javascript:alert(1)' },
+      ],
+    };
+    expect(resolveExtraLinks(t, sessionOn(t, '2026-11-11')!)).toEqual([
+      { label: 'Audio', url: 'https://example.org/shiur?daf=Bekhorot.54a&d=2026-11-11' },
+    ]);
   });
 });

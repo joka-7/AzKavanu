@@ -5,6 +5,7 @@ import {
   parseISODate,
   occurrence,
   periodProgress,
+  resolveExtraLinks,
   resolveLink,
   toISODate,
   toLocalDate,
@@ -107,7 +108,12 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
     setSelected(today);
   };
 
-  const sessions = repo.sessions(selected);
+  // Timed sessions first, in order of the day; the rest follow by name.
+  const sessions = repo.sessions(selected).sort((a, b) => {
+    const ta = trackById.get(a.trackId)?.time?.start ?? '99';
+    const tb = trackById.get(b.trackId)?.time?.start ?? '99';
+    return ta < tb ? -1 : ta > tb ? 1 : 0;
+  });
   const assigned = sessions.filter((s) => !s.optional);
   const doneCount = assigned.filter((s) => repo.isDone(s.trackId, selected)).length;
 
@@ -137,7 +143,8 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
             {sessions.map((s) => {
               const track = trackById.get(s.trackId)!;
               const done = repo.isDone(track.id, selected);
-              const url = resolveLink(track, s);
+              const url = resolveLink(track, s, locale);
+              const extra = resolveExtraLinks(track, s, locale);
               const run = s.optional ? 0 : streak(repo, track, today);
               const quota = periodProgress(track.schedule, selected, repo.doneDates(track.id));
               return (
@@ -153,6 +160,12 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
                   </label>
                   <div className="session-text">
                     <span className="session-title">{track.title}</span>
+                    {track.time && (
+                      <span className="session-time" dir="ltr">
+                        {track.time.start}
+                        {track.time.end ? `–${track.time.end}` : ''}
+                      </span>
+                    )}
                     <span className="session-unit">{(locale === 'he' && s.labelHe) || s.label}</span>
                     {quota && (
                       <span className={quota.done >= quota.target ? 'session-streak' : 'session-quota'}>
@@ -162,10 +175,19 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
                     {run > 1 && <span className="session-streak">{t.streak(run)}</span>}
                     {track.notes && <span className="session-notes">{track.notes}</span>}
                   </div>
-                  {url && (
-                    <a className="btn" href={url} target="_blank" rel="noopener noreferrer">
-                      {t.open}
-                    </a>
+                  {(url || extra.length > 0) && (
+                    <div className="session-links">
+                      {url && (
+                        <a className="btn" href={url} target="_blank" rel="noopener noreferrer">
+                          {t.open}
+                        </a>
+                      )}
+                      {extra.map((l) => (
+                        <a key={l.label + l.url} className="btn" href={l.url} target="_blank" rel="noopener noreferrer">
+                          {l.label}
+                        </a>
+                      ))}
+                    </div>
                   )}
                 </li>
               );

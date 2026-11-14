@@ -16,6 +16,8 @@ export interface Session {
   lastUnit?: number;
   /** Link supplied by the curriculum itself, if any. */
   builtinUrl?: string;
+  /** A Hebrew-language page for the same material, where it differs from the localised main link. */
+  builtinUrlHe?: string;
   /** True for flexible tracks: the day is available for a session, not assigned one. */
   optional: boolean;
 }
@@ -178,7 +180,7 @@ function polishHebrew(cycle: FixedCycle, text: string): string {
   }
 }
 
-function fixedCycleMaterial(cycle: FixedCycle, date: ISODate, israel: boolean): Pick<Session, 'label' | 'labelHe' | 'builtinUrl'> | null {
+function fixedCycleMaterial(cycle: FixedCycle, date: ISODate, israel: boolean): Pick<Session, 'label' | 'labelHe' | 'builtinUrl' | 'builtinUrlHe'> | null {
   const hd = new HDate(toLocalDate(date));
   try {
     if (cycle === 'parasha') {
@@ -186,7 +188,13 @@ function fixedCycleMaterial(cycle: FixedCycle, date: ISODate, israel: boolean): 
       const result = HebrewCalendar.getSedra(hd.getFullYear(), israel).lookup(hd);
       if (result.chag || !result.parsha?.length) return null;
       const ev = new ParshaEvent(result);
-      return { label: ev.render('en'), labelHe: ev.render('he'), builtinUrl: ev.url() };
+      return {
+        label: ev.render('en'),
+        labelHe: ev.render('he'),
+        builtinUrl: ev.url(),
+        // Sefaria resolves a parasha name to its Torah reading and has a Hebrew edition.
+        builtinUrlHe: `https://www.sefaria.org.il/Parashat_${encodeURIComponent(result.parsha[0]!.replace(/ /g, '_'))}?lang=he`,
+      };
     }
     const ev = DailyLearning.lookup(cycle, hd, israel);
     if (!ev) return null;

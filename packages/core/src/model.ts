@@ -96,6 +96,10 @@ export const trackSchema = z.object({
   link: linkSchema,
   reminders: z.array(reminderRuleSchema).max(10),
   notes: z.string().max(500).optional(),
+  /** Time of day for the session; absent means any time of day. */
+  time: z.object({ start: timeOfDay, end: timeOfDay.optional() }).optional(),
+  /** Additional resources per session (audio, a second site); same placeholders as the link template. */
+  extraLinks: z.array(z.object({ label: z.string().min(1).max(40), urlTemplate: z.string().min(1).max(2000) })).max(5).optional(),
   archived: z.boolean(),
   deleted: z.boolean(),
   hlc,

@@ -189,3 +189,14 @@ textarea { font: inherit; color: inherit; border: 1px solid var(--line); border-
 .month-head p { margin: 2px 0 0; }
 .month-head { flex-wrap: wrap; }
 .month-nav { flex-wrap: wrap; }
+
+/* Category picker */
+.categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.category { border: 1px solid var(--line); background: var(--bg); border-radius: 12px; padding: 22px 12px; font-weight: 600; cursor: pointer; }
+.category:hover { border-color: var(--accent); color: var(--accent); }
+.subtabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px; }
+.row.times { grid-template-columns: repeat(2, minmax(0, 180px)); }
+.extra-link { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 8px; margin-bottom: 8px; }
+.session-time { font-size: 0.85rem; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; align-self: flex-start; }
+.session-links { display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 480px) { .extra-link { grid-template-columns: minmax(0, 1fr); } }
