@@ -1,4 +1,4 @@
-import { HDate, gematriya } from '@hebcal/core';
+import { HDate, HebrewCalendar, gematriya } from '@hebcal/core';
 import {
   addDays,
   dayOfWeek,
@@ -28,13 +28,49 @@ function streak(repo: Repository, track: StudyTrack, today: ISODate): number {
   return n;
 }
 
-function monthGrid(year: number, month: number): ISODate[] {
-  const first = `${year}-${String(month).padStart(2, '0')}-01`;
-  const start = addDays(first, -dayOfWeek(first));
+interface MonthModel {
+  title: string;
+  /** The same span in the other calendar, e.g. "Nov – Dec 2026" under a Hebrew month. */
+  subtitle: string;
+  cells: ISODate[];
+  first: ISODate;
+  last: ISODate;
+}
+
+/** The month containing `anchor`, in either calendar, as whole weeks starting on Sunday. */
+function monthModel(anchor: ISODate, hebrew: boolean, locale: string): MonthModel {
+  const intl = locale === 'he' ? 'he-IL' : 'en-GB';
+  let first: ISODate;
+  let last: ISODate;
+  let title: string;
+  let subtitle: string;
+  if (hebrew) {
+    const hd = new HDate(toLocalDate(anchor));
+    const start = new HDate(1, hd.getMonth(), hd.getFullYear());
+    first = toISODate(start.greg());
+    last = addDays(first, start.daysInMonth() - 1);
+    title =
+      locale === 'he'
+        ? start.renderGematriya(true).split(' ').slice(1).join(' ')
+        : `${start.getMonthName()} ${start.getFullYear()}`;
+    const fmt = new Intl.DateTimeFormat(intl, { month: 'short', year: 'numeric' });
+    const a = fmt.format(toLocalDate(first));
+    const b = fmt.format(toLocalDate(last));
+    subtitle = a === b ? a : `${a} – ${b}`;
+  } else {
+    const { y, m } = parseISODate(anchor);
+    first = `${y}-${String(m).padStart(2, '0')}-01`;
+    last = addDays(m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`, -1);
+    title = new Intl.DateTimeFormat(intl, { month: 'long', year: 'numeric' }).format(toLocalDate(first));
+    const name = (d: ISODate) => {
+      const hd = new HDate(toLocalDate(d));
+      return locale === 'he' ? hd.renderGematriya(true).split(' ').slice(1).join(' ') : `${hd.getMonthName()} ${hd.getFullYear()}`;
+    };
+    subtitle = name(first) === name(last) ? name(first) : `${name(first)} – ${name(last)}`;
+  }
   const cells: ISODate[] = [];
-  for (let i = 0; i < 42; i++) cells.push(addDays(start, i));
-  // Drop a trailing week that lies entirely in the next month.
-  return parseISODate(cells[35]!).m === month ? cells : cells.slice(0, 35);
+  for (let d = addDays(first, -dayOfWeek(first)); d <= last || cells.length % 7 !== 0; d = addDays(d, 1)) cells.push(d);
+  return { title, subtitle, cells, first, last };
 }
 
 export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
@@ -42,36 +78,32 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
   const { locale, t } = useLocale();
   const today = toISODate(new Date());
   const [selected, setSelected] = useState<ISODate>(today);
-  const [cursor, setCursor] = useState(() => {
-    const { y, m } = parseISODate(today);
-    return { y, m };
-  });
+  const hebrew = repo.setting('calendar', locale === 'he' ? 'hebrew' : 'gregorian') === 'hebrew';
+  /** Any date inside the month being shown. */
+  const [anchor, setAnchor] = useState<ISODate>(today);
 
   const tracks = repo.tracks();
   const trackById = useMemo(() => new Map(tracks.map((x) => [x.id, x])), [tracks]);
-  const cells = useMemo(() => monthGrid(cursor.y, cursor.m), [cursor]);
+  const month = useMemo(() => monthModel(anchor, hebrew, locale), [anchor, hebrew, locale]);
   const intlLocale = locale === 'he' ? 'he-IL' : 'en-GB';
-
-  const monthTitle = new Intl.DateTimeFormat(intlLocale, { month: 'long', year: 'numeric' }).format(
-    new Date(cursor.y, cursor.m - 1, 1),
-  );
   const weekdayNames = Array.from({ length: 7 }, (_, i) =>
     new Intl.DateTimeFormat(intlLocale, { weekday: 'short' }).format(new Date(2026, 10, 1 + i)),
   );
-  const selectedTitle = new Intl.DateTimeFormat(intlLocale, { weekday: 'long', day: 'numeric', month: 'long' }).format(
+
+  const selectedHd = new HDate(toLocalDate(selected));
+  const weekday = new Intl.DateTimeFormat(intlLocale, { weekday: 'long' }).format(toLocalDate(selected));
+  const gregorianText = new Intl.DateTimeFormat(intlLocale, { day: 'numeric', month: 'long', year: 'numeric' }).format(
     toLocalDate(selected),
   );
-  const selectedHebrew = new HDate(toLocalDate(selected));
-
-  const shift = (delta: number) =>
-    setCursor(({ y, m }) => {
-      const idx = y * 12 + (m - 1) + delta;
-      return { y: Math.floor(idx / 12), m: (idx % 12) + 1 };
-    });
+  const hebrewText = locale === 'he' ? selectedHd.renderGematriya(true) : selectedHd.render('en');
+  const selectedTitle = `${weekday}, ${hebrew ? hebrewText : gregorianText}`;
+  const selectedOther = hebrew ? gregorianText : hebrewText;
+  const holidays = (HebrewCalendar.getHolidaysOnDate(selectedHd, repo.setting('israel', false)) ?? [])
+    .map((ev) => ev.render(locale === 'he' ? 'he' : 'en'))
+    .join(' · ');
 
   const goToday = () => {
-    const { y, m } = parseISODate(today);
-    setCursor({ y, m });
+    setAnchor(today);
     setSelected(today);
   };
 
@@ -85,9 +117,8 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
         <div className="day-head">
           <div>
             <h2 id="day-title">{selected === today ? `${t.today} · ${selectedTitle}` : selectedTitle}</h2>
-            <p className="muted">
-              {locale === 'he' ? selectedHebrew.renderGematriya(true) : selectedHebrew.render('en')}
-            </p>
+            <p className="muted">{selectedOther}</p>
+            {holidays && <p className="holiday">{holidays}</p>}
           </div>
           {assigned.length > 0 && <span className="count">{t.doneOf(doneCount, assigned.length)}</span>}
         </div>
@@ -143,17 +174,23 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
         )}
       </section>
 
-      <section className="card month" aria-label={monthTitle}>
+      <section className="card month" aria-label={month.title}>
         <div className="month-head">
-          <h2>{monthTitle}</h2>
+          <div>
+            <h2>{month.title}</h2>
+            <p className="muted small">{month.subtitle}</p>
+          </div>
           <div className="month-nav">
+            <button className="btn" onClick={() => void repo.setSetting('calendar', hebrew ? 'gregorian' : 'hebrew')}>
+              {hebrew ? t.calGregorian : t.calHebrew}
+            </button>
             <button className="btn" onClick={goToday}>
               {t.today}
             </button>
-            <button className="btn icon" aria-label={t.prevMonth} onClick={() => shift(-1)}>
+            <button className="btn icon" aria-label={t.prevMonth} onClick={() => setAnchor(addDays(month.first, -1))}>
               <span className="chev prev" aria-hidden="true" />
             </button>
-            <button className="btn icon" aria-label={t.nextMonth} onClick={() => shift(1)}>
+            <button className="btn icon" aria-label={t.nextMonth} onClick={() => setAnchor(addDays(month.last, 1))}>
               <span className="chev next" aria-hidden="true" />
             </button>
           </div>
@@ -164,12 +201,14 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
               {w}
             </div>
           ))}
-          {cells.map((date) => {
-            const { m, d } = parseISODate(date);
+          {month.cells.map((date) => {
+            const { d } = parseISODate(date);
+            const hDay = new HDate(toLocalDate(date)).getDate();
+            const hText = locale === 'he' ? gematriya(hDay) : String(hDay);
             // A flexible track has no assigned days, so the grid marks only the days it was done.
             const daySessions = repo.sessions(date).filter((x) => !x.optional || repo.isDone(x.trackId, date));
             const classes = ['cell'];
-            if (m !== cursor.m) classes.push('other');
+            if (date < month.first || date > month.last) classes.push('other');
             if (date === today) classes.push('is-today');
             if (date === selected) classes.push('is-selected');
             return (
@@ -182,8 +221,8 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
                 onClick={() => setSelected(date)}
               >
                 <span className="cell-num">
-                  <span className="greg">{d}</span>
-                  <span className="heb">{gematriya(new HDate(toLocalDate(date)).getDate())}</span>
+                  <span className="greg">{hebrew ? hText : d}</span>
+                  <span className="heb">{hebrew ? d : hText}</span>
                 </span>
                 <span className="dots">
                   {daySessions.map((s) => {

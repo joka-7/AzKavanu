@@ -310,7 +310,7 @@ describe('monthly recurrence', () => {
     ...base,
     id: 't_month',
     title: 'Review',
-    schedule: { kind: 'freeform', startDate: '2026-01-15', recurrence: { type: 'monthly', daysOfMonth: [1, 15, 31] } },
+    schedule: { kind: 'freeform', startDate: '2026-01-15', recurrence: { type: 'monthly', daysOfMonth: [1, 15, 31], calendar: 'gregorian' } },
     link: { provider: 'none' },
   };
   it('occurs on the chosen days and skips days a month lacks', () => {
@@ -321,5 +321,26 @@ describe('monthly recurrence', () => {
     expect(sessionOn(t, '2026-02-28')).toBeNull();
     expect(sessionOn(t, '2026-03-01')!.sessionIndex).toBe(5);
     expect(sessionOn(t, '2027-01-01')!.sessionIndex).toBe(31);
+  });
+});
+
+describe('Hebrew-month recurrence', () => {
+  const t: StudyTrack = {
+    ...base,
+    id: 't_rc',
+    title: 'Rosh Chodesh shiur',
+    // 1 Kislev 5787 is 11 November 2026.
+    schedule: { kind: 'freeform', startDate: '2026-11-01', recurrence: { type: 'monthly', daysOfMonth: [1, 30], calendar: 'hebrew' } },
+    link: { provider: 'none' },
+  };
+  it('occurs on days of the Hebrew month, skipping day 30 in short months', () => {
+    expect(sessionOn(t, '2026-11-10')!.sessionIndex).toBe(1); // 30 Cheshvan 5787
+    expect(sessionOn(t, '2026-11-11')!.sessionIndex).toBe(2); // 1 Kislev
+    expect(sessionOn(t, '2026-11-12')).toBeNull();
+    const dates: string[] = [];
+    for (let d = '2026-11-12'; d < '2027-03-01'; d = addDays(d, 1)) if (sessionOn(t, d)) dates.push(d);
+    const indexes = dates.map((d) => sessionOn(t, d)!.sessionIndex);
+    expect(indexes).toEqual(indexes.map((_, i) => i + 3));
+    expect(dates.length).toBeGreaterThanOrEqual(4);
   });
 });

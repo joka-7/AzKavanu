@@ -13,7 +13,7 @@ Implemented (architecture phases 1a and 1b):
   - Talmud daf by daf or Mishnah one by one at your own pace, from any tractate
   - numbered units (chapters, simanim, lessons) or plain counted sessions for anything else: a language, exam preparation, a book, a discussion
 - Flexible timing: every day, chosen weekdays, chosen days of the month, or a number of times per week or month on whichever days you choose. Own-pace tracks advance only when a session is marked done.
-- Calendar with per-day check-off, Hebrew dates and streaks
+- Calendar in Hebrew or Gregorian months with per-day check-off, holidays and streaks; schedules can use days of the Hebrew month
 - Daily links: built-in Sefaria links for the fixed cycles, URL templates for everything else
 - Local-first storage in IndexedDB, installable as a PWA, English and Hebrew (RTL)
 - Google Drive sync into the hidden app-data folder, with per-record merge between devices

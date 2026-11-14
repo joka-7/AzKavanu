@@ -11,7 +11,12 @@ export const recurrenceSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('daily') }),
   z.object({ type: z.literal('weekly'), daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1) }),
   /** Fixed days of the calendar month; a day the month lacks (e.g. the 31st) is skipped. */
-  z.object({ type: z.literal('monthly'), daysOfMonth: z.array(z.number().int().min(1).max(31)).min(1) }),
+  z.object({
+    type: z.literal('monthly'),
+    daysOfMonth: z.array(z.number().int().min(1).max(31)).min(1),
+    /** Which calendar's month the days refer to. */
+    calendar: z.enum(['gregorian', 'hebrew']).default('gregorian'),
+  }),
   /** No fixed days: a target number of sessions per week or month, done whenever the learner chooses. */
   z.object({ type: z.literal('flexible'), times: z.number().int().min(1).max(31), per: z.enum(['week', 'month']) }),
 ]);

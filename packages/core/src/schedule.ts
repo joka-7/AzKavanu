@@ -42,7 +42,9 @@ function matches(rec: Recurrence, date: ISODate): boolean {
     case 'weekly':
       return rec.daysOfWeek.includes(dayOfWeek(date));
     case 'monthly':
-      return rec.daysOfMonth.includes(parseISODate(date).d);
+      return rec.daysOfMonth.includes(
+        rec.calendar === 'hebrew' ? new HDate(toLocalDate(date)).getDate() : parseISODate(date).d,
+      );
   }
 }
 
@@ -70,6 +72,23 @@ function occurrencesThrough(rec: Recurrence, start: ISODate, date: ISODate): num
     let count = Math.floor(span / 7) * days.size;
     const startDow = dayOfWeek(start);
     for (let i = 0; i < span % 7; i++) if (days.has((startDow + i) % 7)) count++;
+    return count;
+  }
+  if (rec.calendar === 'hebrew') {
+    // Walk Hebrew months from the start; each contributes its chosen days that fall in range.
+    const first = new HDate(toLocalDate(start)).abs();
+    const last = new HDate(toLocalDate(date)).abs();
+    let count = 0;
+    let month = new HDate(first);
+    month = new HDate(1, month.getMonth(), month.getFullYear());
+    while (month.abs() <= last) {
+      const length = month.daysInMonth();
+      for (const d of rec.daysOfMonth) {
+        const abs = month.abs() + d - 1;
+        if (d <= length && abs >= first && abs <= last) count++;
+      }
+      month = new HDate(month.abs() + length);
+    }
     return count;
   }
   const a = parseISODate(start);

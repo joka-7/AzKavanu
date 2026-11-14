@@ -9,6 +9,7 @@ import {
   type StudyTrack,
   type TrackInput,
 } from '@kavanu/core';
+import { gematriya } from '@hebcal/core';
 import { useState } from 'react';
 import { useLocale, useRepo } from '../context';
 import { describeSchedule, weekdayNames } from '../describe';
@@ -34,6 +35,7 @@ interface Draft {
   when: When;
   daysOfWeek: number[];
   daysOfMonth: number[];
+  monthCalendar: 'gregorian' | 'hebrew';
   times: string;
   advance: 'calendar' | 'completion';
   builtinLink: boolean;
@@ -59,6 +61,7 @@ function blankDraft(count: number): Draft {
     when: 'daily',
     daysOfWeek: [0, 1, 2, 3, 4],
     daysOfMonth: [1],
+    monthCalendar: 'gregorian',
     times: '2',
     advance: 'completion',
     builtinLink: true,
@@ -85,6 +88,7 @@ function toDraft(t: StudyTrack): Draft {
   } else if (rec.type === 'monthly') {
     d.when = 'monthly';
     d.daysOfMonth = rec.daysOfMonth;
+    d.monthCalendar = rec.calendar;
   } else if (rec.type === 'flexible') {
     d.when = rec.per === 'week' ? 'perWeek' : 'perMonth';
     d.times = String(rec.times);
@@ -128,7 +132,11 @@ function toInput(d: Draft): TrackInput {
     d.when === 'weekly' && d.daysOfWeek.length > 0
       ? { type: 'weekly', daysOfWeek: [...d.daysOfWeek].sort() }
       : d.when === 'monthly' && d.daysOfMonth.length > 0
-        ? { type: 'monthly', daysOfMonth: [...d.daysOfMonth].sort((a, b) => a - b) }
+        ? {
+            type: 'monthly',
+            daysOfMonth: [...d.daysOfMonth].filter((x) => d.monthCalendar === 'gregorian' || x <= 30).sort((a, b) => a - b),
+            calendar: d.monthCalendar,
+          }
         : d.when === 'perWeek'
           ? { type: 'flexible', times: int(d.times, 1, 7), per: 'week' }
           : d.when === 'perMonth'
@@ -418,8 +426,20 @@ export function TracksView() {
           </div>
         )}
         {draft.when === 'monthly' && (
+          <label className="field narrow">
+            <span>{t.monthOf}</span>
+            <select
+              value={draft.monthCalendar}
+              onChange={(e) => set({ monthCalendar: e.target.value as Draft['monthCalendar'] })}
+            >
+              <option value="gregorian">{t.monthGregorian}</option>
+              <option value="hebrew">{t.monthHebrew}</option>
+            </select>
+          </label>
+        )}
+        {draft.when === 'monthly' && (
           <div className="days month-days" role="group" aria-label={t.whenMonthly}>
-            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+            {Array.from({ length: draft.monthCalendar === 'hebrew' ? 30 : 31 }, (_, i) => i + 1).map((d) => (
               <button
                 type="button"
                 key={d}
@@ -427,7 +447,7 @@ export function TracksView() {
                 aria-pressed={draft.daysOfMonth.includes(d)}
                 onClick={() => set({ daysOfMonth: toggle(draft.daysOfMonth, d) })}
               >
-                {d}
+                {draft.monthCalendar === 'hebrew' && locale === 'he' ? gematriya(d) : d}
               </button>
             ))}
           </div>

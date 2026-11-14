@@ -1,3 +1,4 @@
+import { gematriya } from '@hebcal/core';
 import { getCurriculum, recurrenceOf, type Schedule } from '@kavanu/core';
 import type { cycleNames, strings } from './i18n';
 
@@ -19,7 +20,14 @@ export function describeSchedule(s: Schedule, t: T, cycles: (typeof cycleNames)[
       : rec.type === 'weekly'
         ? [...rec.daysOfWeek].sort().map((d) => days[d]).join(', ')
         : rec.type === 'monthly'
-          ? t.monthDays([...rec.daysOfMonth].sort((a, b) => a - b).join(', '))
+          ? rec.calendar === 'hebrew'
+            ? t.hebrewMonthDays(
+                [...rec.daysOfMonth]
+                  .sort((a, b) => a - b)
+                  .map((d) => (locale === 'he' ? gematriya(d) : String(d)))
+                  .join(', '),
+              )
+            : t.monthDays([...rec.daysOfMonth].sort((a, b) => a - b).join(', '))
           : rec.per === 'week'
             ? t.xPerWeek(rec.times)
             : t.xPerMonth(rec.times);
