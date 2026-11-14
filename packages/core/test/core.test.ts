@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FIXED_CYCLES,
   HlcClock,
+  getCurriculum,
+  occurrence,
+  periodProgress,
   addDays,
   compareHlc,
   mergeDocs,
@@ -34,6 +38,8 @@ const chapters: StudyTrack = {
   title: 'Book',
   schedule: {
     kind: 'sequential',
+    curriculum: 'custom',
+    advance: 'calendar',
     startDate: '2026-11-01',
     unitLabel: 'Chapter',
     startUnit: 1,
@@ -159,13 +165,13 @@ describe('planReminders', () => {
   const now = toLocalDate('2026-11-01', 12, 0);
 
   it('plans future reminders only on scheduled days', () => {
-    const plan = planReminders([t], () => false, now, { windowDays: 3 });
+    const plan = planReminders([t], () => ({}), now, { windowDays: 3 });
     expect(plan.map((n) => n.id)).toEqual(['t_hist|2026-11-01|pm', 't_hist|2026-11-03|am', 't_hist|2026-11-03|pm']);
     expect(plan[0]!.fireAt).toBe(toLocalDate('2026-11-01', 21, 0).getTime());
   });
 
   it('drops the nudge once the day is done', () => {
-    const plan = planReminders([t], (_id, date) => date === '2026-11-01', now, { windowDays: 3 });
+    const plan = planReminders([t], () => ({ doneDates: ['2026-11-01'] }), now, { windowDays: 3 });
     expect(plan.map((n) => n.id)).not.toContain('t_hist|2026-11-01|pm');
     expect(plan).toHaveLength(2);
   });
@@ -173,5 +179,134 @@ describe('planReminders', () => {
   it('addDays crosses month ends', () => {
     expect(addDays('2026-11-30', 1)).toBe('2026-12-01');
     expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+  });
+});
+
+describe('fixed cycles', () => {
+  it('every listed cycle yields material and an http link on an ordinary weekday', () => {
+    for (const cycle of FIXED_CYCLES) {
+      const t: StudyTrack = { ...daf, id: `t_${cycle}`, schedule: { kind: 'fixedCycle', cycle } };
+      // Tuesday 10 November 2026; tolerate cycles that pause on some days by scanning a week.
+      const dates = Array.from({ length: 7 }, (_, i) => addDays('2026-11-10', i));
+      const s = dates.map((d) => sessionOn(t, d)).find(Boolean);
+      expect(s, cycle).toBeTruthy();
+      expect(s!.label.length, cycle).toBeGreaterThan(0);
+      if (s!.builtinUrl) expect(resolveLink(t, s!), cycle).toMatch(/^https:/);
+    }
+  });
+
+  it('gives the parasha of the coming Shabbat and can be limited to chosen days', () => {
+    const t: StudyTrack = {
+      ...daf,
+      id: 't_p',
+      schedule: { kind: 'fixedCycle', cycle: 'parasha', recurrence: { type: 'weekly', daysOfWeek: [4, 5] } },
+    };
+    expect(sessionOn(t, '2026-11-11')).toBeNull(); // Wednesday
+    expect(sessionOn(t, '2026-11-12', { israel: true })!.label).toBe('Parashat Toldot');
+    expect(sessionOn(t, '2026-11-13', { israel: true })!.labelHe).toContain('תּוֹלְדוֹת');
+  });
+});
+
+describe('own-pace study', () => {
+  const mishnah: StudyTrack = {
+    ...base,
+    id: 't_own',
+    title: 'Mishnah',
+    schedule: {
+      kind: 'sequential',
+      curriculum: 'mishnah',
+      startDate: '2026-11-01',
+      unitLabel: '',
+      startUnit: 1,
+      unitsPerSession: 1,
+      recurrence: { type: 'flexible', times: 2, per: 'week' },
+      advance: 'completion',
+    },
+    link: { provider: 'builtin' },
+  };
+
+  it('builds the Talmud and Mishnah lists from the calendar library', () => {
+    const talmud = getCurriculum('talmud')!;
+    expect(talmud.units).toHaveLength(2711);
+    expect(talmud.sections[0]).toMatchObject({ name: 'Berachot', start: 1, count: 63 });
+    expect(talmud.units.at(-1)).toMatchObject({ section: 'Niddah', ref: '73' });
+    const m = getCurriculum('mishnah')!;
+    expect(m.units).toHaveLength(4192);
+    expect(m.sections).toHaveLength(63);
+    expect(m.units[0]).toMatchObject({ section: 'Berakhot', ref: '1:1', sectionHe: 'ברכות' });
+  });
+
+  it('offers the next unit on any day and advances only when a session is completed', () => {
+    expect(occurrence(mishnah.schedule, '2026-11-03')).toBe('optional');
+    const first = sessionOn(mishnah, '2026-11-03')!;
+    expect(first).toMatchObject({ label: 'Berakhot 1:1', optional: true });
+    expect(resolveLink(mishnah, first)).toBe('https://www.sefaria.org/Mishnah_Berakhot.1.1?lang=bi');
+    // A week later with nothing done, it is still the first mishna.
+    expect(sessionOn(mishnah, '2026-11-10')!.label).toBe('Berakhot 1:1');
+    const ctx = { doneDates: ['2026-11-03', '2026-11-05'] };
+    expect(sessionOn(mishnah, '2026-11-03', ctx)!.label).toBe('Berakhot 1:1');
+    expect(sessionOn(mishnah, '2026-11-05', ctx)!.label).toBe('Berakhot 1:2');
+    expect(sessionOn(mishnah, '2026-11-20', ctx)!.label).toBe('Berakhot 1:3');
+  });
+
+  it('counts sessions against the weekly or monthly target', () => {
+    const done = ['2026-11-03', '2026-11-05', '2026-11-08'];
+    expect(periodProgress(mishnah.schedule, '2026-11-06', done)).toEqual({ done: 2, target: 2, per: 'week' });
+    expect(periodProgress(mishnah.schedule, '2026-11-09', done)).toEqual({ done: 1, target: 2, per: 'week' });
+    const monthly = { ...mishnah.schedule, recurrence: { type: 'flexible', times: 4, per: 'month' } } as StudyTrack['schedule'];
+    expect(periodProgress(monthly, '2026-11-30', done)).toEqual({ done: 3, target: 4, per: 'month' });
+    expect(periodProgress(chapters.schedule, '2026-11-06', done)).toBeNull();
+  });
+
+  it('continues from the last completed session when a fixed-day track is paced by completion', () => {
+    const t: StudyTrack = {
+      ...base,
+      id: 't_daf',
+      title: 'Daf',
+      schedule: {
+        kind: 'sequential',
+        curriculum: 'talmud',
+        startDate: '2026-11-01',
+        unitLabel: '',
+        startUnit: getCurriculum('talmud')!.sections.find((x) => x.name === 'Megillah')!.start,
+        unitsPerSession: 1,
+        recurrence: { type: 'weekly', daysOfWeek: [0, 3] },
+        advance: 'completion',
+      },
+      link: { provider: 'builtin' },
+    };
+    expect(sessionOn(t, '2026-11-02')).toBeNull();
+    expect(sessionOn(t, '2026-11-04')!.label).toBe('Megillah 2');
+    expect(sessionOn(t, '2026-11-04', { doneDates: ['2026-11-01'] })!.label).toBe('Megillah 3');
+    expect(sessionOn(t, '2026-11-04', { doneDates: ['2026-11-01'] })!.labelHe).toBe('מגילה ג׳');
+  });
+
+  it('stops reminding once the weekly target is met', () => {
+    const t: StudyTrack = { ...mishnah, reminders: [{ id: 'r', time: '20:00', onlyIfNotDone: true }] };
+    const now = toLocalDate('2026-11-03', 8, 0); // Tuesday
+    const open = planReminders([t], () => ({ doneDates: ['2026-11-01'] }), now, { windowDays: 5 });
+    expect(open.map((n) => n.date)).toEqual(['2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07']);
+    const met = planReminders([t], () => ({ doneDates: ['2026-11-01', '2026-11-02'] }), now, { windowDays: 6 });
+    // Nothing for the rest of this week; the new week (from Sunday the 8th) starts again.
+    expect(met.map((n) => n.date)).toEqual(['2026-11-08']);
+  });
+});
+
+describe('monthly recurrence', () => {
+  const t: StudyTrack = {
+    ...base,
+    id: 't_month',
+    title: 'Review',
+    schedule: { kind: 'freeform', startDate: '2026-01-15', recurrence: { type: 'monthly', daysOfMonth: [1, 15, 31] } },
+    link: { provider: 'none' },
+  };
+  it('occurs on the chosen days and skips days a month lacks', () => {
+    expect(sessionOn(t, '2026-01-15')!.sessionIndex).toBe(1);
+    expect(sessionOn(t, '2026-01-31')!.sessionIndex).toBe(2);
+    expect(sessionOn(t, '2026-02-01')!.sessionIndex).toBe(3);
+    expect(sessionOn(t, '2026-02-15')!.sessionIndex).toBe(4);
+    expect(sessionOn(t, '2026-02-28')).toBeNull();
+    expect(sessionOn(t, '2026-03-01')!.sessionIndex).toBe(5);
+    expect(sessionOn(t, '2027-01-01')!.sessionIndex).toBe(31);
   });
 });

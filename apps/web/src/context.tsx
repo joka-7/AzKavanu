@@ -1,5 +1,5 @@
 import { createContext, useContext, useSyncExternalStore } from 'react';
-import { defaultLocale, strings, type Locale } from './i18n';
+import { cycleNames, defaultLocale, strings, type Locale } from './i18n';
 import type { Services, SyncStatus } from './services';
 
 export const ServicesContext = createContext<Services | null>(null);
@@ -22,10 +22,11 @@ export function useSyncStatus(): SyncStatus {
   return useSyncExternalStore(sync.subscribe, sync.getStatus);
 }
 
-export function useLocale(): { locale: Locale; t: (typeof strings)['en'] } {
+export function useLocale(): { locale: Locale; t: (typeof strings)['en']; cycles: (typeof cycleNames)['en'] } {
   const repo = useRepo();
   const locale = repo.setting<Locale>('locale', defaultLocale());
-  return { locale, t: strings[locale] ?? strings.en };
+  const l = strings[locale] ? locale : 'en';
+  return { locale: l, t: strings[l], cycles: cycleNames[l] };
 }
 
 const noSubscribe = () => () => {};

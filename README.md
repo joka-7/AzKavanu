@@ -8,13 +8,17 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
 Implemented (architecture phases 1a and 1b):
 
-- Study tracks: Daf Yomi, Mishna Yomi, numbered units (chapters, pages, lessons) and recurring sessions, daily or on chosen weekdays
+- Study tracks from a catalogue or your own:
+  - about 20 established cycles (Daf Yomi, Mishna Yomi, Daf Yomi B'Halacha, Kitzur, Rambam, Nach Yomi, 929, Tehillim, Tanya and more) and the weekly parasha
+  - Talmud daf by daf or Mishnah one by one at your own pace, from any tractate
+  - numbered units (chapters, simanim, lessons) or plain counted sessions for anything else: a language, exam preparation, a book, a discussion
+- Flexible timing: every day, chosen weekdays, chosen days of the month, or a number of times per week or month on whichever days you choose. Own-pace tracks advance only when a session is marked done.
 - Calendar with per-day check-off, Hebrew dates and streaks
 - Daily links: built-in Sefaria links for the fixed cycles, URL templates for everything else
 - Local-first storage in IndexedDB, installable as a PWA, English and Hebrew (RTL)
 - Google Drive sync into the hidden app-data folder, with per-record merge between devices
 - Reminders while the app is open
-- Study groups: one shared Drive file per group, invitations by email, a seven-day view of each member's progress
+- Study groups on any track: one shared Drive file per group, invitations by email, an optional description and maximum size, a seven-day view of each member's progress
 
 - Android app (Capacitor shell): the same interface, with reminders that fire while the app is closed. It is local-only for now, because Google sign-in needs a native implementation on Android.
 

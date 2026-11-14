@@ -11,13 +11,15 @@ import {
   type Membership,
   type ProgressRecord,
   type StudyTrack,
+  type StudyTrackInput,
 } from './model';
 import type { LocalStorePort } from './ports';
+import { sessionOn, type ScheduleContext, type Session } from './schedule';
 
 const DOC_PREFIX = 'doc:';
 const DIRTY_KEY = 'meta:dirty';
 
-export type TrackInput = Omit<StudyTrack, 'hlc' | 'deleted' | 'id'> & { id?: string };
+export type TrackInput = Omit<StudyTrackInput, 'hlc' | 'deleted' | 'id'> & { id?: string };
 
 /**
  * The local replica. The UI reads and writes only this; the sync engine
@@ -28,6 +30,7 @@ export class Repository {
   private dirty = new Set<string>();
   private listeners = new Set<() => void>();
   private revision = 0;
+  private doneIndex: Map<string, ISODate[]> | null = null;
   readonly clock: HlcClock;
 
   constructor(
@@ -81,6 +84,48 @@ export class Repository {
   }
 
   isDone = (trackId: string, date: ISODate): boolean => this.progress(trackId, date)?.done === true;
+
+  /** Dates each track was completed, ascending. Rebuilt lazily after any change. */
+  doneDates(trackId: string): readonly ISODate[] {
+    if (!this.doneIndex) {
+      const index = new Map<string, ISODate[]>();
+      for (const [name, doc] of this.docs) {
+        if (docKind(name) !== 'progress') continue;
+        for (const [key, rec] of Object.entries(doc.records as Record<string, ProgressRecord>)) {
+          if (!rec.done) continue;
+          const cut = key.lastIndexOf('|');
+          const id = key.slice(0, cut);
+          const list = index.get(id) ?? [];
+          list.push(key.slice(cut + 1));
+          index.set(id, list);
+        }
+      }
+      for (const list of index.values()) list.sort();
+      this.doneIndex = index;
+    }
+    return this.doneIndex.get(trackId) ?? [];
+  }
+
+  /** Everything the schedule engine needs to resolve this track's sessions. */
+  context = (trackId: string): ScheduleContext => ({
+    doneDates: this.doneDates(trackId),
+    israel: this.setting('israel', false),
+  });
+
+  session(track: StudyTrack, date: ISODate): Session | null {
+    return sessionOn(track, date, this.context(track.id));
+  }
+
+  /** Sessions of all active tracks on a date. */
+  sessions(date: ISODate): Session[] {
+    const out: Session[] = [];
+    for (const t of this.tracks()) {
+      if (t.archived) continue;
+      const s = this.session(t, date);
+      if (s) out.push(s);
+    }
+    return out;
+  }
 
   setting<T>(key: string, fallback: T): T {
     const rec = this.docs.get('settings')?.records[key] as { value: unknown } | undefined;
@@ -197,6 +242,7 @@ export class Repository {
   }
 
   private emit(): void {
+    this.doneIndex = null;
     this.revision++;
     for (const l of this.listeners) l();
   }

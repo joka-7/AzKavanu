@@ -179,6 +179,11 @@ export async function createServices(): Promise<Services> {
     await repo.setManifestValue(`device:${id}`, { platform: 'web', label: navigator.userAgent.slice(0, 120) });
   }
 
+  // The weekly parasha differs between Israel and elsewhere; start from the interface language.
+  if (repo.setting<boolean | null>('israel', null) === null) {
+    await repo.setSetting('israel', navigator.language.toLowerCase().startsWith('he'));
+  }
+
   const notifier = createNotifier();
   let replanTimer: number | undefined;
   const replanReminders = () => {
@@ -186,7 +191,7 @@ export async function createServices(): Promise<Services> {
     clearTimeout(replanTimer);
     replanTimer = window.setTimeout(() => {
       void notifier.reconcile(
-        planReminders(repo.tracks(), repo.isDone, new Date(), {
+        planReminders(repo.tracks(), repo.context, new Date(), {
           windowDays: notifier.windowDays,
           locale: repo.setting('locale', 'en'),
         }),

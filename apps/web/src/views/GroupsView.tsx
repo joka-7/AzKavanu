@@ -1,6 +1,7 @@
-import type { GroupView, TrackTemplate } from '@kavanu/core';
+import { GroupFullError, type GroupPreview, type GroupView } from '@kavanu/core';
 import { useState } from 'react';
 import { useGroups, useLocale, useRepo, useServices, useSyncStatus } from '../context';
+import { describeSchedule } from '../describe';
 import { DriveHttpError } from '../platform/googleDrive';
 import { grantFileAccess, pickerAvailable } from '../platform/picker';
 
@@ -64,6 +65,8 @@ function CreatePanel({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState('');
   const [displayName, setDisplayName] = useState(repo.setting('displayName', ''));
   const [trackId, setTrackId] = useState(tracks[0]?.id ?? '');
+  const [description, setDescription] = useState('');
+  const [maxMembers, setMaxMembers] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,7 +86,14 @@ function CreatePanel({ onDone }: { onDone: () => void }) {
     setError(null);
     try {
       await repo.setSetting('displayName', displayName.trim());
-      await groups.createGroup({ name, displayName, trackId });
+      const max = Math.floor(Number(maxMembers));
+      await groups.createGroup({
+        name,
+        displayName,
+        trackId,
+        description,
+        ...(max >= 2 ? { maxMembers: Math.min(100, max) } : {}),
+      });
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -118,6 +128,14 @@ function CreatePanel({ onDone }: { onDone: () => void }) {
           ))}
         </select>
       </label>
+      <label className="field">
+        <span>{t.groupDescription}</span>
+        <textarea rows={2} maxLength={300} value={description} onChange={(e) => setDescription(e.target.value)} />
+      </label>
+      <label className="field narrow">
+        <span>{t.groupMax}</span>
+        <input type="number" min={2} max={100} value={maxMembers} onChange={(e) => setMaxMembers(e.target.value)} />
+      </label>
       <p className="muted small">{t.groupPrivacy}</p>
       {error && <p className="error">{error}</p>}
       <div className="actions">
@@ -136,8 +154,8 @@ function JoinPanel({ fileId, onDone }: { fileId: string; onDone: () => void }) {
   const repo = useRepo();
   const groups = useGroups()!;
   const { sync } = useServices();
-  const { t } = useLocale();
-  const [info, setInfo] = useState<{ name: string; track: TrackTemplate; memberCount: number } | null>(null);
+  const { locale, t, cycles } = useLocale();
+  const [info, setInfo] = useState<GroupPreview | null>(null);
   const [displayName, setDisplayName] = useState(repo.setting('displayName', ''));
   const [trackId, setTrackId] = useState('');
   const [busy, setBusy] = useState(false);
@@ -170,7 +188,7 @@ function JoinPanel({ fileId, onDone }: { fileId: string; onDone: () => void }) {
       await groups.joinGroup({ fileId, displayName, trackId: trackId || null });
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(err instanceof GroupFullError ? t.groupFull : err instanceof Error ? err.message : String(err));
       setBusy(false);
     }
   };
@@ -189,9 +207,17 @@ function JoinPanel({ fileId, onDone }: { fileId: string; onDone: () => void }) {
       ) : (
         <>
           <p>
-            <strong>{t.joinInfo(info.name, info.memberCount)}</strong>
+            <strong>{info.name}</strong> · {t.groupMembers(info.memberCount, info.maxMembers)}
             <br />
-            <span className="muted">{info.track.title}</span>
+            <span className="muted">
+              {info.track.title} · {describeSchedule(info.track.schedule, t, cycles, locale)}
+            </span>
+            {info.description && (
+              <>
+                <br />
+                {info.description}
+              </>
+            )}
           </p>
           <label className="field">
             <span>{t.yourName}</span>
@@ -227,7 +253,7 @@ function JoinPanel({ fileId, onDone }: { fileId: string; onDone: () => void }) {
 function GroupCard({ group }: { group: GroupView }) {
   const groups = useGroups()!;
   const { sync } = useServices();
-  const { locale, t } = useLocale();
+  const { locale, t, cycles } = useLocale();
   const [email, setEmail] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -278,7 +304,12 @@ function GroupCard({ group }: { group: GroupView }) {
       <div className="list-head">
         <div>
           <h2>{group.name}</h2>
-          <p className="muted small">{group.track.title}</p>
+          <p className="muted small">
+            {group.track.title} · {describeSchedule(group.track.schedule, t, cycles, locale)}
+            <br />
+            {t.groupMembers(group.members.length, group.maxMembers)}
+          </p>
+          {group.description && <p>{group.description}</p>}
         </div>
       </div>
       {group.error && <p className="error">{t.groupError(group.error)}</p>}

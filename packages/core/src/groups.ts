@@ -8,12 +8,11 @@ import {
   type GroupMeta,
   type GroupRecord,
   type Membership,
-  type StudyTrack,
   type TrackTemplate,
 } from './model';
 import type { LocalStorePort } from './ports';
 import type { Repository } from './repository';
-import { sessionOn } from './schedule';
+import { occurrence } from './schedule';
 
 /** How many days of completion history a member publishes to a group. */
 export const GROUP_WINDOW_DAYS = 60;
@@ -29,6 +28,15 @@ export interface GroupFilePort {
 }
 
 type GroupDoc = RecordDoc<GroupRecord>;
+
+export interface GroupPreview {
+  id: string;
+  name: string;
+  description?: string;
+  maxMembers?: number;
+  track: TrackTemplate;
+  memberCount: number;
+}
 
 interface CachedGroup {
   doc: GroupDoc;
@@ -49,6 +57,8 @@ export interface MemberView {
 export interface GroupView {
   id: string;
   name: string;
+  description?: string;
+  maxMembers?: number;
   track: TrackTemplate;
   role: Membership['role'];
   driveFileId: string;
@@ -60,10 +70,6 @@ function memberKey(memberId: string): string {
   return `member:${memberId}`;
 }
 
-function templateTrack(t: TrackTemplate): StudyTrack {
-  return { ...t, id: 'group', reminders: [], archived: false, deleted: false, hlc: '' };
-}
-
 function sameContent(a: GroupRecord | undefined, b: Omit<GroupMember, 'hlc'>): boolean {
   if (!a || a.kind !== 'member') return false;
   const { hlc: _hlc, ...rest } = a;
@@ -73,22 +79,29 @@ function sameContent(a: GroupRecord | undefined, b: Omit<GroupMember, 'hlc'>): b
 }
 
 export function memberStats(track: TrackTemplate, member: GroupMember, today: ISODate, days = 7) {
-  const t = templateTrack(track);
   const lastDays: MemberView['lastDays'] = [];
   for (let i = days - 1; i >= 0; i--) {
     const date = addDays(today, -i);
-    lastDays.push({ date, done: sessionOn(t, date) ? member.recent[date] === true : null });
+    const done = member.recent[date] === true;
+    // On a flexible track no particular day is expected, so only completed days are marked.
+    lastDays.push({ date, done: occurrence(track.schedule, date) === 'fixed' ? done : done ? true : null });
   }
   let doneLast30 = 0;
   for (let i = 0; i < 30; i++) if (member.recent[addDays(today, -i)]) doneLast30++;
   let streak = 0;
   for (let i = 0; i < GROUP_WINDOW_DAYS; i++) {
     const date = addDays(today, -i);
-    if (!sessionOn(t, date)) continue;
+    if (occurrence(track.schedule, date) !== 'fixed') continue;
     if (member.recent[date]) streak++;
     else if (i > 0) break;
   }
   return { lastDays, doneLast30, streak };
+}
+
+export class GroupFullError extends Error {
+  constructor() {
+    super('This group is full');
+  }
 }
 
 /**
@@ -151,14 +164,20 @@ export class GroupManager {
         });
       }
       members.sort((a, b) => Number(b.isMe) - Number(a.isMe) || a.displayName.localeCompare(b.displayName));
-      out.push({ id, name: meta.name, track: meta.track, role: m.role, driveFileId: m.driveFileId, members, error: cached.error });
+      out.push({ id, name: meta.name, description: meta.description, maxMembers: meta.maxMembers, track: meta.track, role: m.role, driveFileId: m.driveFileId, members, error: cached.error });
     }
     return out.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   // ---- actions -----------------------------------------------------------
 
-  async createGroup(input: { name: string; displayName: string; trackId: string }): Promise<string> {
+  async createGroup(input: {
+    name: string;
+    displayName: string;
+    trackId: string;
+    description?: string;
+    maxMembers?: number;
+  }): Promise<string> {
     const track = this.repo.track(input.trackId);
     if (!track) throw new Error('Track not found');
     const id = `g_${crypto.randomUUID()}`;
@@ -167,6 +186,8 @@ export class GroupManager {
       kind: 'meta',
       id,
       name: input.name.trim(),
+      ...(input.description?.trim() ? { description: input.description.trim() } : {}),
+      ...(input.maxMembers ? { maxMembers: input.maxMembers } : {}),
       track: { title: track.title, color: track.color, schedule: track.schedule, link: track.link },
       hlc: this.repo.clock.tick(),
     };
@@ -181,18 +202,27 @@ export class GroupManager {
   }
 
   /** Read a group file before joining, to show what is being joined. */
-  async peek(fileId: string): Promise<{ id: string; name: string; track: TrackTemplate; memberCount: number }> {
+  async peek(fileId: string): Promise<GroupPreview> {
     const doc = parseGroupDoc(await this.files.download(fileId));
     const meta = doc.records.meta;
     if (meta?.kind !== 'meta') throw new Error('Not a Kavanu group file');
     const memberCount = Object.values(doc.records).filter((r) => r.kind === 'member' && !r.left).length;
-    return { id: meta.id, name: meta.name, track: meta.track, memberCount };
+    return {
+      id: meta.id,
+      name: meta.name,
+      description: meta.description,
+      maxMembers: meta.maxMembers,
+      track: meta.track,
+      memberCount,
+    };
   }
 
   /** `trackId: null` adopts the group's track as a new local track. */
   async joinGroup(input: { fileId: string; displayName: string; trackId: string | null }): Promise<string> {
     const info = await this.peek(input.fileId);
     const existing = this.repo.memberships()[info.id];
+    const rejoining = existing !== undefined && !existing.left;
+    if (!rejoining && info.maxMembers !== undefined && info.memberCount >= info.maxMembers) throw new GroupFullError();
     const trackId = input.trackId ?? (await this.repo.saveTrack({ ...info.track, reminders: [], archived: false })).id;
     await this.repo.setSetting('displayName', input.displayName);
     await this.repo.saveMembership(info.id, {

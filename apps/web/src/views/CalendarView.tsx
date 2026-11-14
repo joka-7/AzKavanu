@@ -3,9 +3,9 @@ import {
   addDays,
   dayOfWeek,
   parseISODate,
+  occurrence,
+  periodProgress,
   resolveLink,
-  sessionOn,
-  sessionsOn,
   toISODate,
   toLocalDate,
   type ISODate,
@@ -15,15 +15,13 @@ import {
 import { useMemo, useState } from 'react';
 import { useLocale, useRepo } from '../context';
 
-/** Consecutive scheduled sessions completed, counting back from today (today may still be open). */
+/** Consecutive assigned sessions completed, counting back from today (today may still be open). */
 function streak(repo: Repository, track: StudyTrack, today: ISODate): number {
   let n = 0;
   for (let i = 0; i < 730; i++) {
     const date = addDays(today, -i);
-    if (!sessionOn(track, date)) {
-      if (track.schedule.kind !== 'fixedCycle' && date < track.schedule.startDate) break;
-      continue;
-    }
+    if (track.schedule.kind !== 'fixedCycle' && date < track.schedule.startDate) break;
+    if (occurrence(track.schedule, date) !== 'fixed') continue;
     if (repo.isDone(track.id, date)) n++;
     else if (i > 0) break;
   }
@@ -77,8 +75,9 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
     setSelected(today);
   };
 
-  const sessions = sessionsOn(tracks, selected);
-  const doneCount = sessions.filter((s) => repo.isDone(s.trackId, selected)).length;
+  const sessions = repo.sessions(selected);
+  const assigned = sessions.filter((s) => !s.optional);
+  const doneCount = assigned.filter((s) => repo.isDone(s.trackId, selected)).length;
 
   return (
     <div className="calendar-layout">
@@ -90,7 +89,7 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
               {locale === 'he' ? selectedHebrew.renderGematriya(true) : selectedHebrew.render('en')}
             </p>
           </div>
-          {sessions.length > 0 && <span className="count">{t.doneOf(doneCount, sessions.length)}</span>}
+          {assigned.length > 0 && <span className="count">{t.doneOf(doneCount, assigned.length)}</span>}
         </div>
 
         {tracks.length === 0 ? (
@@ -108,7 +107,8 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
               const track = trackById.get(s.trackId)!;
               const done = repo.isDone(track.id, selected);
               const url = resolveLink(track, s);
-              const run = streak(repo, track, today);
+              const run = s.optional ? 0 : streak(repo, track, today);
+              const quota = periodProgress(track.schedule, selected, repo.doneDates(track.id));
               return (
                 <li key={track.id} className={done ? 'session done' : 'session'} style={{ '--track': track.color } as React.CSSProperties}>
                   <label className="check">
@@ -123,7 +123,13 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
                   <div className="session-text">
                     <span className="session-title">{track.title}</span>
                     <span className="session-unit">{(locale === 'he' && s.labelHe) || s.label}</span>
+                    {quota && (
+                      <span className={quota.done >= quota.target ? 'session-streak' : 'session-quota'}>
+                        {t.quota(quota.done, quota.target, quota.per)}
+                      </span>
+                    )}
                     {run > 1 && <span className="session-streak">{t.streak(run)}</span>}
+                    {track.notes && <span className="session-notes">{track.notes}</span>}
                   </div>
                   {url && (
                     <a className="btn" href={url} target="_blank" rel="noopener noreferrer">
@@ -160,7 +166,8 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
           ))}
           {cells.map((date) => {
             const { m, d } = parseISODate(date);
-            const daySessions = sessionsOn(tracks, date);
+            // A flexible track has no assigned days, so the grid marks only the days it was done.
+            const daySessions = repo.sessions(date).filter((x) => !x.optional || repo.isDone(x.trackId, date));
             const classes = ['cell'];
             if (m !== cursor.m) classes.push('other');
             if (date === today) classes.push('is-today');
