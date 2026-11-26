@@ -112,6 +112,8 @@ export const progressSchema = z.object({
   done: z.boolean(),
   doneAt: z.string().optional(),
   note: z.string().max(2000).optional(),
+  /** A link the user attached to this particular day's session (used when none is found, or to override). */
+  link: z.string().max(2000).optional(),
   hlc,
 });
 export type ProgressRecord = z.infer<typeof progressSchema>;

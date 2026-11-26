@@ -173,3 +173,36 @@ describe('SyncEngine', () => {
     expect((await drive.list()).map((f) => f.name)).toEqual(['progress-2026']);
   });
 });
+
+describe('session links and reminders', () => {
+  it('stores a per-day link, keeps it through done toggles, and syncs it', async () => {
+    const drive = new MemoryDrive();
+    const phone = await device('phone', drive);
+    const laptop = await device('laptop', drive);
+    const track = await phone.repo.saveTrack(trackInput);
+    await phone.repo.setSessionLink(track.id, '2026-11-09', 'example.org/shiur');
+    await phone.repo.setDone(track.id, '2026-11-09', true);
+    expect(phone.repo.progress(track.id, '2026-11-09')).toMatchObject({ done: true, link: 'https://example.org/shiur' });
+    await expect(phone.repo.setSessionLink(track.id, '2026-11-09', 'javascript:alert(1)')).rejects.toThrow('Invalid link');
+    await phone.engine.sync();
+    await laptop.engine.sync();
+    const s = laptop.repo.session(laptop.repo.track(track.id)!, '2026-11-09')!;
+    expect(s.customUrl).toBe('https://example.org/shiur');
+    await laptop.repo.setSessionLink(track.id, '2026-11-09', null);
+    expect(laptop.repo.progress(track.id, '2026-11-09')).toMatchObject({ done: true });
+    expect(laptop.repo.progress(track.id, '2026-11-09')!.link).toBeUndefined();
+  });
+
+  it('adds a reminder to a track once', async () => {
+    const drive = new MemoryDrive();
+    const phone = await device('phone', drive);
+    const track = await phone.repo.saveTrack(trackInput);
+    await phone.repo.addReminder(track.id, '07:00');
+    await phone.repo.addReminder(track.id, '07:00');
+    await phone.repo.addReminder(track.id, '21:00', false);
+    expect(phone.repo.track(track.id)!.reminders.map((r) => [r.time, r.onlyIfNotDone])).toEqual([
+      ['07:00', true],
+      ['21:00', false],
+    ]);
+  });
+});

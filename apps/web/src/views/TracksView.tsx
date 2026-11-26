@@ -12,6 +12,7 @@ import {
 import { gematriya } from '@hebcal/core';
 import { useState } from 'react';
 import { useLocale, useRepo } from '../context';
+import { isNative } from '../platform/notifications';
 import { describeSchedule, weekdayNames } from '../describe';
 import { CATEGORIES, curriculumOf, type Category, type Material, type Preset, type When } from '../presets';
 

@@ -47,7 +47,7 @@ The document name is also its Drive file name.
 | `manifest` | `device:<id>` and other keys | `manifestRecordSchema` (`value`) |
 | `settings` | setting key | `settingSchema` (`value`) |
 | `tracks` | track id | `trackSchema` (schedule, link, reminders, `deleted`) |
-| `progress-<yyyy>` | `progressKey(trackId, date)` = `trackId\|YYYY-MM-DD` | `progressSchema` |
+| `progress-<yyyy>` | `progressKey(trackId, date)` = `trackId\|YYYY-MM-DD` | `progressSchema` (`done`, optional `note` and per-day `link`) |
 | `groups` | group id | `membershipSchema` (file id, role, member id, track, `left`) |
 | `group-<id>` (shared) | `meta` or a member key | `groupRecordSchema`, a union on `kind: 'meta' \| 'member'`; at most 201 records |
 
@@ -76,7 +76,7 @@ Commutative, associative and idempotent. Deletes and un-ticks are records with a
 
 Owns the in-memory documents, persists each to the store under a `doc:` key, and keeps the set
 of dirty (unsynced) document names. Writes (`saveTrack`, `deleteTrack`, `setDone`,
-`setSetting`, `saveMembership`, `setManifestValue`) stamp the record with `clock.tick()`, mark
+`setSessionLink`, `addReminder`, `setSetting`, `saveMembership`, `setManifestValue`) stamp the record with `clock.tick()`, mark
 the document dirty and notify subscribers. `getRevision()` changes on every mutation and is the
 `useSyncExternalStore` snapshot. The sync engine uses `docNames`, `getDoc`, `isDirty`,
 `setDirty` and `applyMerged`.
