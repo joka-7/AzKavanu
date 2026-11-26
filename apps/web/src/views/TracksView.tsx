@@ -14,7 +14,6 @@ import { useState } from 'react';
 import { useLocale, useRepo } from '../context';
 import { isNative } from '../platform/notifications';
 import { describeSchedule, weekdayNames } from '../describe';
-import { EventPanel } from './EventPanel';
 import { CATEGORIES, curriculumOf, type Category, type Material, type Preset, type When } from '../presets';
 
 const COLORS = ['#27408b', '#1f7a5c', '#b4532a', '#7a3e9d', '#a8324a', '#2f6f8f', '#8a6d1a', '#4a5560'];
@@ -228,7 +227,6 @@ export function TracksView() {
   const [picking, setPicking] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
   const [groupIndex, setGroupIndex] = useState(0);
-  const [eventFor, setEventFor] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const dayNames = weekdayNames(locale);
@@ -732,15 +730,9 @@ export function TracksView() {
                 <span className="session-title">{tr.title}</span>
                 <span className="muted">{describeSchedule(tr.schedule, t, cycles, locale)}</span>
               </div>
-              {!isNative && (
-                <button className="btn" aria-expanded={eventFor === tr.id} onClick={() => setEventFor(eventFor === tr.id ? null : tr.id)}>
-                  {t.addToCalendarBtn}
-                </button>
-              )}
               <button className="btn" onClick={() => setDraft(toDraft(tr))}>
                 {t.edit}
               </button>
-              {eventFor === tr.id && <EventPanel repo={repo} track={tr} date={toISODate(new Date())} onClose={() => setEventFor(null)} />}
             </li>
           ))}
         </ul>

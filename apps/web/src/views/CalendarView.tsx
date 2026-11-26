@@ -83,6 +83,8 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
   const { notifier } = useServices();
   const { locale, t } = useLocale();
   const [panel, setPanel] = useState<{ trackId: string; kind: 'link' | 'reminder' | 'event' } | null>(null);
+  /** The study whose secondary actions (link, reminder, calendar) are showing. */
+  const [moreFor, setMoreFor] = useState<string | null>(null);
   const [linkText, setLinkText] = useState('');
   const [reminderTime, setReminderTime] = useState('20:00');
   const [reminderOnlyIfNotDone, setReminderOnlyIfNotDone] = useState(true);
@@ -243,18 +245,42 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
                         {l.label}
                       </a>
                     ))}
-                    <button className="btn" aria-expanded={open === 'link'} onClick={() => togglePanel('link')}>
-                      {url ? t.changeLink : t.addLink}
-                    </button>
-                    <button className="btn" aria-expanded={open === 'reminder'} onClick={() => togglePanel('reminder')}>
-                      {t.remindMe}
-                    </button>
-                    {!isNative && (
-                      <button className="btn" aria-expanded={open === 'event'} onClick={() => togglePanel('event')}>
-                        {t.addToCalendarBtn}
+                    {!url && (
+                      <button className="btn" aria-expanded={open === 'link'} onClick={() => togglePanel('link')}>
+                        {t.addLink}
                       </button>
                     )}
+                    <button
+                      className="btn"
+                      aria-expanded={moreFor === track.id}
+                      aria-controls={`more-${track.id}`}
+                      onClick={() => {
+                        setMessage(null);
+                        if (moreFor === track.id) setPanel(null);
+                        setMoreFor(moreFor === track.id ? null : track.id);
+                      }}
+                    >
+                      {t.moreActions}
+                    </button>
                   </div>
+
+                  {moreFor === track.id && (
+                    <div className="session-actions session-more" id={`more-${track.id}`}>
+                      {url && (
+                        <button className="btn" aria-expanded={open === 'link'} onClick={() => togglePanel('link')}>
+                          {t.changeLink}
+                        </button>
+                      )}
+                      <button className="btn" aria-expanded={open === 'reminder'} onClick={() => togglePanel('reminder')}>
+                        {t.remindMe}
+                      </button>
+                      {!isNative && (
+                        <button className="btn" aria-expanded={open === 'event'} onClick={() => togglePanel('event')}>
+                          {t.addToCalendarBtn}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {open === 'event' && <EventPanel repo={repo} track={track} date={selected} onClose={() => setPanel(null)} />}
 
