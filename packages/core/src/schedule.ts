@@ -1,5 +1,6 @@
 import { DailyLearning, HDate, HebrewCalendar, ParshaEvent } from '@hebcal/core';
-import '@hebcal/learning';
+import { DafPage } from '@hebcal/learning';
+import { parashaRef, talmudRef, tanakhRef, type AppRef } from './apps';
 import { getCurriculum } from './curricula';
 import { addDays, dayOfWeek, diffDays, parseISODate, toLocalDate, type ISODate } from './dates';
 import type { FixedCycle, Recurrence, Schedule, StudyTrack } from './model';
@@ -20,6 +21,8 @@ export interface Session {
   builtinUrlHe?: string;
   /** A link the user attached to this day; takes priority over the built-in link. */
   customUrl?: string;
+  /** Where this day's page is in the user's own Talmud and Tanakh apps, when it has one. */
+  appRef?: AppRef;
   /** True for flexible tracks: the day is available for a session, not assigned one. */
   optional: boolean;
 }
@@ -182,7 +185,42 @@ function polishHebrew(cycle: FixedCycle, text: string): string {
   }
 }
 
-function fixedCycleMaterial(cycle: FixedCycle, date: ISODate, israel: boolean): Pick<Session, 'label' | 'labelHe' | 'builtinUrl' | 'builtinUrlHe'> | null {
+/** Hebrew tractate name for a Talmud page, in the spelling the Talmud app uses. */
+function hebrewTractate(english: string, daf: number): string {
+  const he = new DafPage(english, daf).render('he').replace(/[\u0591-\u05C7]/g, ''); // the library adds vowel marks to a few names
+  const cut = he.lastIndexOf(' דף ');
+  return cut > 0 ? he.slice(0, cut) : he;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function appRefFor(cycle: FixedCycle, ev: any): AppRef | null {
+  try {
+    switch (cycle) {
+      case 'dafYomi':
+      case 'dafWeekly':
+        return talmudRef(hebrewTractate(ev.daf.name, ev.daf.blatt), ev.daf.blatt, 'a');
+      case 'dirshuAmudYomi':
+        return talmudRef(hebrewTractate(ev.amud.name, ev.amud.amud), ev.amud.amud, ev.amud.side === 'b' ? 'b' : 'a');
+      case 'nachYomi':
+        return tanakhRef(ev.k, parseInt(ev.v, 10));
+      case '929':
+        return tanakhRef(ev.reading.book, ev.reading.bookChap);
+      case 'tanakhYomi': {
+        const m = /^(.*?) (\d+):/.exec(ev.daf.verses);
+        return m ? tanakhRef(m[1]!, Number(m[2])) : null;
+      }
+      case 'psalms':
+        return tanakhRef('Psalms', Array.isArray(ev.reading) ? parseInt(String(ev.reading[0]), 10) : NaN);
+      default:
+        return null;
+    }
+  } catch {
+    return null;
+  }
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+function fixedCycleMaterial(cycle: FixedCycle, date: ISODate, israel: boolean): Pick<Session, 'label' | 'labelHe' | 'builtinUrl' | 'builtinUrlHe' | 'appRef'> | null {
   const hd = new HDate(toLocalDate(date));
   try {
     if (cycle === 'parasha') {
@@ -196,6 +234,7 @@ function fixedCycleMaterial(cycle: FixedCycle, date: ISODate, israel: boolean): 
         builtinUrl: ev.url(),
         // Sefaria resolves a parasha name to its Torah reading and has a Hebrew edition.
         builtinUrlHe: `https://www.sefaria.org.il/Parashat_${encodeURIComponent(result.parsha[0]!.replace(/ /g, '_'))}?lang=he`,
+        appRef: parashaRef(result.parsha[0]!) ?? undefined,
       };
     }
     const ev = DailyLearning.lookup(cycle, hd, israel);
@@ -204,6 +243,7 @@ function fixedCycleMaterial(cycle: FixedCycle, date: ISODate, israel: boolean): 
       label: stripPrefix(cycle, ev.render('en')),
       labelHe: polishHebrew(cycle, stripPrefix(cycle, ev.render('he'))),
       builtinUrl: ev.url() ?? undefined,
+      appRef: appRefFor(cycle, ev) ?? undefined,
     };
   } catch {
     return null; // Date outside the cycle's defined range.
@@ -253,6 +293,7 @@ export function sessionOn(track: StudyTrack, date: ISODate, ctx: ScheduleContext
       label: same ? `${a.section} ${range(a.ref, b.ref)}` : `${a.section} ${a.ref} – ${b.section} ${b.ref}`,
       labelHe: same ? `${a.sectionHe} ${range(a.refHe, b.refHe)}` : `${a.sectionHe} ${a.refHe} – ${b.sectionHe} ${b.refHe}`,
       builtinUrl: a.url || undefined,
+      appRef: (s.curriculum === 'talmud' ? talmudRef(a.sectionHe, Number(a.ref), 'a') : null) ?? undefined,
     };
   }
 

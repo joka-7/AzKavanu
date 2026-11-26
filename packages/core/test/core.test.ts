@@ -1,6 +1,15 @@
+import { HDate, HebrewCalendar } from '@hebcal/core';
 import { describe, expect, it } from 'vitest';
 import {
   FIXED_CYCLES,
+  SHAS_TRACTATES,
+  eventIcs,
+  firstOccurrence,
+  googleCalendarUrl,
+  parashaRef,
+  repeatFromRecurrence,
+  resolveAppLinks,
+  rruleOf,
   buildIcs,
   resolveExtraLinks,
   HlcClock,
@@ -400,5 +409,135 @@ describe('links the user attaches', () => {
     expect(resolveLink(daf, s, 'he')).toBe('https://example.org/my-shiur');
     expect(resolveLink(cyc, { ...s, customUrl: 'javascript:alert(1)' })).toBeNull();
     expect(resolveLink(cyc, { ...s, customUrl: undefined })).toBeNull();
+  });
+});
+
+describe('links to the user\'s own apps', () => {
+  const track = (cycle: (typeof FIXED_CYCLES)[number]): StudyTrack => ({ ...daf, id: `t_${cycle}`, schedule: { kind: 'fixedCycle', cycle } });
+  const urlsOn = (cycle: (typeof FIXED_CYCLES)[number], date: string) => resolveAppLinks(sessionOn(track(cycle), date, { israel: true }) ?? {}).map((l) => decodeURIComponent(l.url));
+
+  it('opens the Daf Yomi page in the Talmud app and the Nach Yomi chapter in the Tanakh app', () => {
+    expect(urlsOn('dafYomi', '2026-11-11')).toEqual(['https://shas-radar.vercel.app/#/daf/בכורות/54/a']);
+    expect(urlsOn('dafWeekly', '2026-11-12')[0]).toMatch(/#\/daf\/נזיר\/\d+\/a$/);
+    expect(urlsOn('dirshuAmudYomi', '2026-11-26')[0]).toMatch(/#\/daf\/סוכה\/21\/a$/);
+    expect(urlsOn('nachYomi', '2026-11-26')[0]).toBe('https://ot-va-ot.vercel.app/#/read/יחזקאל/23');
+    expect(urlsOn('929', '2026-11-26')[0]).toBe('https://ot-va-ot.vercel.app/#/read/מלכים ב/16');
+    expect(urlsOn('psalms', '2026-11-26')[0]).toBe('https://ot-va-ot.vercel.app/#/read/תהילים/79');
+    expect(urlsOn('tanakhYomi', '2026-11-26')[0]).toBe('https://ot-va-ot.vercel.app/#/read/שמואל א/26');
+    expect(urlsOn('parasha', '2026-11-26')).toEqual(['https://ot-va-ot.vercel.app/#/read/בראשית/32']); // Vayishlach, read on 28 Nov
+  });
+
+  it('has no link for material the apps do not contain', () => {
+    expect(urlsOn('mishnaYomi', '2026-11-11')).toEqual([]);
+    expect(urlsOn('rambam1', '2026-11-11')).toEqual([]);
+  });
+
+  it('every tractate Daf Yomi visits across a full cycle is in the Talmud app, bar the three it lacks', () => {
+    const seen = new Set<string>();
+    const missing = new Set<string>();
+    for (let i = 0; i < 2800; i += 1) {
+      const s = sessionOn(track('dafYomi'), addDays('2020-01-05', i));
+      if (!s) continue;
+      const he = s.labelHe!.replace(/[\u0591-\u05C7]/g, '').replace(/ דף .*$/, '');
+      (s.appRef ? seen : missing).add(he);
+    }
+    expect(seen.size).toBe(37);
+    for (const name of seen) expect(SHAS_TRACTATES.has(name)).toBe(true);
+    expect([...missing].sort()).toEqual(['מדות', 'קינים', 'שקלים'].sort());
+  });
+
+  it('every Nach, 929 and Tanakh Yomi book, and every parasha, has a link', () => {
+    for (const cycle of ['nachYomi', '929', 'tanakhYomi', 'psalms'] as const) {
+      for (let i = 0; i < 1300; i += 3) {
+        const s = sessionOn(track(cycle), addDays('2026-01-01', i));
+        if (s) expect(s.appRef, `${cycle} ${s.date} ${s.label}`).toBeTruthy();
+      }
+    }
+    for (const il of [true, false]) {
+      for (let year = 5787; year <= 5790; year++) {
+        const sedra = HebrewCalendar.getSedra(year, il);
+        for (let d = new HDate(1, 7, year).abs(); d < new HDate(1, 7, year + 1).abs(); d += 7) {
+          const r = sedra.lookup(d);
+          if (!r.chag && r.parsha?.length) expect(parashaRef(r.parsha[0]!), `${year} ${r.parsha[0]}`).toBeTruthy();
+        }
+      }
+    }
+  });
+
+  it('own-pace Talmud study links to the page being studied', () => {
+    const t: StudyTrack = {
+      ...base,
+      id: 't_o',
+      title: 'Daf',
+      schedule: { kind: 'sequential', curriculum: 'talmud', startDate: '2026-11-01', unitLabel: '', startUnit: getCurriculum('talmud')!.sections.find((x) => x.name === 'Megillah')!.start, unitsPerSession: 1, recurrence: { type: 'flexible', times: 2, per: 'week' }, advance: 'completion' },
+      link: { provider: 'builtin' },
+    };
+    expect(resolveAppLinks(sessionOn(t, '2026-11-03', { doneDates: ['2026-11-01'] })!)[0]!.url).toBe(
+      `https://shas-radar.vercel.app/#/daf/${encodeURIComponent('מגילה')}/3/a`,
+    );
+  });
+});
+
+describe('calendar events with recurrence', () => {
+  const spec = (repeat: Parameters<typeof rruleOf>[0], extra = {}) => ({
+    uid: 'e1',
+    title: 'Daf Yomi, בכורות',
+    description: 'Study; with a partner',
+    url: 'https://www.sefaria.org.il/Bekhorot.54a?lang=he',
+    date: '2026-11-11', // Wednesday
+    start: '06:30',
+    end: '07:15',
+    repeat,
+    alarmMinutes: 15,
+    ...extra,
+  });
+
+  it('writes RRULEs for daily, weekly, monthly and bounded repeats', () => {
+    expect(rruleOf({ freq: 'none', end: { type: 'never' } })).toBeNull();
+    expect(rruleOf({ freq: 'daily', end: { type: 'never' } })).toBe('FREQ=DAILY');
+    expect(rruleOf({ freq: 'weekly', days: [4, 0, 2], end: { type: 'count', count: 10 } })).toBe('FREQ=WEEKLY;BYDAY=SU,TU,TH;COUNT=10');
+    expect(rruleOf({ freq: 'monthly', monthDays: [15, 1], end: { type: 'until', date: '2027-06-30' } })).toBe('FREQ=MONTHLY;BYMONTHDAY=1,15;UNTIL=20270630T235959');
+  });
+
+  it('starts on the first day the rule actually produces', () => {
+    expect(firstOccurrence({ date: '2026-11-11', repeat: { freq: 'weekly', days: [0, 2], end: { type: 'never' } } })).toBe('2026-11-15');
+    expect(firstOccurrence({ date: '2026-11-11', repeat: { freq: 'monthly', monthDays: [1], end: { type: 'never' } } })).toBe('2026-12-01');
+    expect(firstOccurrence({ date: '2026-11-11', repeat: { freq: 'none', end: { type: 'never' } } })).toBe('2026-11-11');
+  });
+
+  it('follows a track\'s schedule when a calendar can express it', () => {
+    expect(repeatFromRecurrence({ type: 'weekly', daysOfWeek: [0, 3] })).toMatchObject({ freq: 'weekly', days: [0, 3] });
+    expect(repeatFromRecurrence({ type: 'flexible', times: 2, per: 'week' })).toBeNull();
+    expect(repeatFromRecurrence({ type: 'monthly', daysOfMonth: [1], calendar: 'hebrew' })).toBeNull();
+  });
+
+  it('builds a valid calendar file with alarm, escaped text and folded lines', () => {
+    const ics = eventIcs(spec({ freq: 'weekly', days: [3], end: { type: 'never' } }), Date.UTC(2026, 10, 1));
+    const flat = ics.replace(/\r\n /g, '');
+    expect(flat).toContain('DTSTART:20261111T063000');
+    expect(flat).toContain('DTEND:20261111T071500');
+    expect(flat).toContain('RRULE:FREQ=WEEKLY;BYDAY=WE');
+    expect(flat).toContain('SUMMARY:Daf Yomi\\, בכורות');
+    expect(flat).toContain('DESCRIPTION:Study\\; with a partner\\n\\nhttps://www.sefaria.org.il/Bekhorot.54a?lang=he');
+    expect(flat).toContain('TRIGGER:-PT15M');
+    for (const line of ics.split('\r\n')) expect(new TextEncoder().encode(line).length).toBeLessThanOrEqual(75);
+    expect(eventIcs(spec({ freq: 'none', end: { type: 'never' } }, ), 0)).not.toContain('RRULE');
+    expect(eventIcs(spec({ freq: 'none', end: { type: 'never' } }, ), 0)).toContain('PT15M');
+    expect(eventIcs({ ...spec({ freq: 'none', end: { type: 'never' } }), alarmMinutes: null }, 0)).not.toContain('VALARM');
+  });
+
+  it('builds a Google Calendar link carrying the details and the recurrence', () => {
+    const u = new URL(googleCalendarUrl(spec({ freq: 'daily', end: { type: 'never' } })));
+    expect(u.origin + u.pathname).toBe('https://calendar.google.com/calendar/render');
+    expect(u.searchParams.get('action')).toBe('TEMPLATE');
+    expect(u.searchParams.get('text')).toBe('Daf Yomi, בכורות');
+    expect(u.searchParams.get('dates')).toBe('20261111T063000/20261111T071500');
+    expect(u.searchParams.get('recur')).toBe('RRULE:FREQ=DAILY');
+    expect(u.searchParams.get('details')).toContain('Bekhorot.54a');
+  });
+
+  it('gives an event without an end time a default length', () => {
+    const ics = eventIcs(spec({ freq: 'none', end: { type: 'never' } }, { end: undefined }), 0);
+    expect(ics).toContain('DTEND:20261111T070000');
   });
 });

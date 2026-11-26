@@ -5,6 +5,7 @@ import {
   parseISODate,
   occurrence,
   periodProgress,
+  resolveAppLinks,
   resolveExtraLinks,
   resolveLink,
   toISODate,
@@ -17,6 +18,7 @@ import { useMemo, useState } from 'react';
 import { downloadCalendarFile } from '../calendarFile';
 import { useLocale, useRepo, useServices } from '../context';
 import { isNative } from '../platform/notifications';
+import { EventPanel } from './EventPanel';
 
 /** Consecutive assigned sessions completed, counting back from today (today may still be open). */
 function streak(repo: Repository, track: StudyTrack, today: ISODate): number {
@@ -80,7 +82,7 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
   const repo = useRepo();
   const { notifier } = useServices();
   const { locale, t } = useLocale();
-  const [panel, setPanel] = useState<{ trackId: string; kind: 'link' | 'reminder' } | null>(null);
+  const [panel, setPanel] = useState<{ trackId: string; kind: 'link' | 'reminder' | 'event' } | null>(null);
   const [linkText, setLinkText] = useState('');
   const [reminderTime, setReminderTime] = useState('20:00');
   const [reminderOnlyIfNotDone, setReminderOnlyIfNotDone] = useState(true);
@@ -153,11 +155,12 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
               const done = repo.isDone(track.id, selected);
               const url = resolveLink(track, s, locale);
               const extra = resolveExtraLinks(track, s, locale);
+              const appLinks = resolveAppLinks(s);
               const run = s.optional ? 0 : streak(repo, track, today);
               const quota = periodProgress(track.schedule, selected, repo.doneDates(track.id));
               const open = panel?.trackId === track.id ? panel.kind : null;
               const times = track.reminders.map((r) => r.time).sort().join(', ');
-              const togglePanel = (kind: 'link' | 'reminder') => {
+              const togglePanel = (kind: 'link' | 'reminder' | 'event') => {
                 setMessage(null);
                 if (open === kind) return setPanel(null);
                 setPanel({ trackId: track.id, kind });
@@ -198,6 +201,11 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
                         {t.open}
                       </a>
                     )}
+                    {appLinks.map((l) => (
+                      <a key={l.app} className="btn" href={l.url} target="_blank" rel="noopener noreferrer">
+                        {l.app === 'shasRadar' ? t.appShasRadar : t.appOtVaOt}
+                      </a>
+                    ))}
                     {extra.map((l) => (
                       <a key={l.label + l.url} className="btn" href={l.url} target="_blank" rel="noopener noreferrer">
                         {l.label}
@@ -209,7 +217,14 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
                     <button className="btn" aria-expanded={open === 'reminder'} onClick={() => togglePanel('reminder')}>
                       {t.remindMe}
                     </button>
+                    {!isNative && (
+                      <button className="btn" aria-expanded={open === 'event'} onClick={() => togglePanel('event')}>
+                        {t.addToCalendarBtn}
+                      </button>
+                    )}
                   </div>
+
+                  {open === 'event' && <EventPanel repo={repo} track={track} date={selected} onClose={() => setPanel(null)} />}
 
                   {open === 'link' && (
                     <form

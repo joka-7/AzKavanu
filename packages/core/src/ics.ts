@@ -1,11 +1,11 @@
 import type { DesiredNotification } from './reminders';
 
-function escapeText(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+export function escapeText(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
 }
 
 /** Lines longer than 75 octets must be folded; never split inside a multi-byte character. */
-function fold(line: string): string {
+export function fold(line: string): string {
   const enc = new TextEncoder();
   const parts: string[] = [];
   let current = '';
@@ -27,12 +27,12 @@ function fold(line: string): string {
 const pad = (n: number, w = 2) => String(n).padStart(w, '0');
 
 /** Floating local time, so the alarm fires at the same wall-clock time wherever the phone is. */
-function localStamp(ms: number): string {
+export function localStamp(ms: number): string {
   const d = new Date(ms);
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
 }
 
-function utcStamp(ms: number): string {
+export function utcStamp(ms: number): string {
   const d = new Date(ms);
   return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
 }
@@ -42,7 +42,14 @@ function utcStamp(ms: number): string {
  * Importing it gives reminders that fire even when the app is closed, on any
  * phone or computer, without a server.
  */
-export function buildIcs(items: DesiredNotification[], calendarName: string, now = Date.now()): string {
+export function buildIcs(
+  items: DesiredNotification[],
+  calendarName: string,
+  now = Date.now(),
+  opts: { durationMin?: number; alarmMinutes?: number | null } = {},
+): string {
+  const durationMs = (opts.durationMin ?? 15) * 60_000;
+  const alarm = opts.alarmMinutes === undefined ? 0 : opts.alarmMinutes;
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -57,14 +64,12 @@ export function buildIcs(items: DesiredNotification[], calendarName: string, now
       `UID:${n.id.replace(/[^A-Za-z0-9|_-]/g, '')}@az-kavanu`,
       `DTSTAMP:${utcStamp(now)}`,
       `DTSTART:${localStamp(n.fireAt)}`,
-      `DTEND:${localStamp(n.fireAt + 15 * 60_000)}`,
+      `DTEND:${localStamp(n.fireAt + durationMs)}`,
       `SUMMARY:${escapeText(n.body ? `${n.title}: ${n.body}` : n.title)}`,
       ...(n.url ? [`URL:${n.url}`, `DESCRIPTION:${escapeText(n.url)}`] : []),
-      'BEGIN:VALARM',
-      'ACTION:DISPLAY',
-      `DESCRIPTION:${escapeText(n.title)}`,
-      'TRIGGER:PT0M',
-      'END:VALARM',
+      ...(alarm === null
+        ? []
+        : ['BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${escapeText(n.title)}`, `TRIGGER:${alarm === 0 ? 'PT0M' : `-PT${alarm}M`}`, 'END:VALARM']),
       'END:VEVENT',
     );
   }

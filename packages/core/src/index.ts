@@ -12,3 +12,5 @@ export * from './sync';
 export * from './memory';
 export * from './groups';
 export * from './ics';
+export * from './apps';
+export * from './calendarEvent';
