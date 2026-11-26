@@ -161,10 +161,12 @@ AzKavanu/
 │       │   │   └── picker.ts                     # Google Picker: the one explicit grant needed to join someone else's group
 │       │   ├── views/
 │       │   │   ├── CalendarView.tsx              # Hebrew or Gregorian month with check-off, holidays and streaks
+│       │   │   ├── EventPanel.tsx                # Adds a study to the user's own calendar: details, repeat rule and alert
 │       │   │   ├── GroupsView.tsx                # Create, join, invite to and leave study groups
 │       │   │   ├── SettingsView.tsx              # Language, Drive connection, reminders, export and reset
 │       │   │   └── TracksView.tsx                # Your tracks: adding one from the catalogue or your own, and editing it
 │       │   ├── App.tsx                           # App shell: tabs for tracks, calendar, groups and settings
+│       │   ├── calendarFile.ts                   # Downloads a track's upcoming reminders as an .ics calendar file
 │       │   ├── context.tsx                       # React context and hooks for the services and the local replica
 │       │   ├── describe.ts                       # One-line human summaries of schedules; weekday names
 │       │   ├── i18n.ts                           # Every user-facing string, in English and Hebrew
@@ -189,11 +191,14 @@ AzKavanu/
 ├── packages/
 │   └── core/                                     # Platform-free TypeScript: model, schedules, merge, sync, groups, reminders
 │       ├── src/
+│       │   ├── apps.ts                           # Addresses of Shas Radar and Ot va-Ot, and which studies open in each
+│       │   ├── calendarEvent.ts                  # Calendar events for a study: repeat rules, end conditions, Google Calendar…
 │       │   ├── crdt.ts                           # Per-record last-writer-wins merge of record documents
 │       │   ├── curricula.ts                      # Ordered unit lists: Talmud by daf, Mishnah by mishna
 │       │   ├── dates.ts                          # Calendar-date (YYYY-MM-DD) helpers
 │       │   ├── groups.ts                         # GroupManager: shared group files holding a section per member
 │       │   ├── hlc.ts                            # Hybrid logical clock stamps that sort as strings
+│       │   ├── ics.ts                            # ICalendar (.ics) text: escaping, line folding, events
 │       │   ├── index.ts                          # Public exports of @kavanu/core
 │       │   ├── links.ts                          # Daily study links: Sefaria and URL templates, unsafe schemes rejected
 │       │   ├── memory.ts                         # In-memory store, Drive and group-file doubles for tests
