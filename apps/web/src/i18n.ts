@@ -4,6 +4,7 @@ export type Locale = 'en' | 'he';
 
 const en = {
   appName: 'Az Kavanu',
+  privacy: 'Privacy',
   navCalendar: 'Calendar',
   navTracks: 'Tracks',
   navSettings: 'Settings',
@@ -270,6 +271,7 @@ type Strings = typeof en;
 
 const he: Strings = {
   appName: 'אז קבענו',
+  privacy: 'פרטיות',
   navCalendar: 'לוח',
   navTracks: 'מסלולים',
   navSettings: 'הגדרות',
