@@ -20,9 +20,9 @@ Implemented (architecture phases 1a and 1b):
 - Reminders while the app is open
 - Study groups on any track: one shared Drive file per group, invitations by email, an optional description and maximum size, a seven-day view of each member's progress
 
-- Android app (Capacitor shell): the same interface, with reminders that fire while the app is closed. It is local-only for now, because Google sign-in needs a native implementation on Android.
+- Android app (Capacitor shell): the same interface, with reminders that fire while the app is closed, and Drive sync through Android's own Google sign-in (Google blocks its web sign-in inside an app).
 
-Not yet implemented: Drive sync and groups on Android, the Google Calendar reminder mirror, signed group sections, the desktop shell.
+Not yet implemented: the Google Calendar reminder mirror, signed group sections, the desktop shell. Joining someone else's group on Android depends on Google's Picker working inside the app, which has not been tried.
 
 ## Layout
 
@@ -74,8 +74,10 @@ npm run build      # static site in apps/web/dist
 
 Every push runs the **Build** workflow on GitHub Actions. Open the run under the repository's *Actions* tab and download:
 
-- `kavanu-debug-apk`: an installable debug APK (allow installing from unknown sources on the phone)
+- `kavanu-debug-apk`: an installable debug APK (allow installing from unknown sources on the phone). It is not signed with the app's key, so Google sign-in does not work in it.
 - `kavanu-web`: the static web build
+
+Every push to `main` also runs **Android release**, which signs the APK with the app's permanent key and publishes it as a GitHub release. The latest is always at <https://github.com/joka-7/AzKavanu/releases/latest/download/AzKavanu.apk>. It needs the signing secrets described under *Android* below.
 
 The **Deploy web to GitHub Pages** workflow publishes the web app on every push to `main`, once *Settings → Pages → Source* is set to *GitHub Actions*. Google settings are read from repository variables named like the `.env` entries below.
 
@@ -99,5 +101,12 @@ Without configuration the app runs in local-only mode. To enable sync:
 Joining a group that someone else created also needs the Google Picker, so that the user can grant the app access to that one shared file:
 
 5. Enable the **Google Picker API**, create an API key restricted to it, and set `VITE_GOOGLE_API_KEY` and `VITE_GOOGLE_APP_ID` (the Cloud project number).
+
+### Android
+
+Android signs in through the OS, so it needs two more things:
+
+6. **A permanent signing key.** Create a PKCS12 keystore with the key alias `azkavanu` (`keytool -genkeypair -storetype PKCS12 -alias azkavanu -keyalg RSA -keysize 2048 -validity 10000`), base64-encode it, and add it to *Settings → Secrets and variables → Actions* as `ANDROID_KEYSTORE_B64` (first 1800 characters) and `ANDROID_KEYSTORE_B64_2` (the rest), with its password as `ANDROID_KEY_PASSWORD`. Back the keystore up outside the repository: without it, installed apps can no longer be updated. Never commit it; `release.keystore` and `secrets/` are ignored.
+7. **An Android OAuth client** in Google Cloud: package name `app.kavanu` and the SHA-1 of that key (the Android release workflow prints it). No client ID from it goes into the app: Google matches it to the Web client by package name and key.
 
 The sync and group logic is covered by unit tests and by a browser test against a simulated Drive API; none of it has yet been run against a real Google account, and the Picker step of joining a group is not exercised by any test.

@@ -118,7 +118,8 @@ AzKavanu/
 │   │   ├── bug.yml
 │   │   └── feature.yml
 │   ├── workflows/
-│   │   ├── build.yml                             # CI: typecheck, test and build the web app, build a debug APK, check the repo…
+│   │   ├── android.yml                           # On main: build, sign with the permanent key and publish AzKavanu.apk as a…
+│   │   ├── build.yml                             # CI: typecheck, test and build the web app, build an unsigned debug APK, check…
 │   │   ├── pages.yml                             # Deploys the web build to GitHub Pages on every push to main
 │   │   └── security.yml                          # Gitleaks, npm audit, Trivy and CodeQL
 │   └── dependabot.yml                            # Weekly updates for npm, Actions, Gradle and the .ai submodule
@@ -153,10 +154,11 @@ AzKavanu/
 │       │   └── sw-notify.js                      # Service-worker hook: tapping a reminder opens the day's study link
 │       ├── src/
 │       │   ├── platform/
-│       │   │   ├── googleAuth.ts                 # Google Identity Services token flow; access token kept in memory
+│       │   │   ├── googleAuth.ts                 # AccessTokenSource contract and the browser's Google Identity Services token…
 │       │   │   ├── googleDrive.ts                # DrivePort over the Drive REST API, confined to the app-data folder
 │       │   │   ├── googleGroupFiles.ts           # Shared group files in the visible Kavanu folder, and their permissions
 │       │   │   ├── idbStore.ts                   # LocalStorePort over one IndexedDB object store
+│       │   │   ├── nativeGoogleAuth.ts           # Android: Drive tokens from the OS through @joka-07/capacitor-auth
 │       │   │   ├── notifications.ts              # Reminder schedulers: timers in the browser, local notifications on Android
 │       │   │   └── picker.ts                     # Google Picker: the one explicit grant needed to join someone else's group
 │       │   ├── views/

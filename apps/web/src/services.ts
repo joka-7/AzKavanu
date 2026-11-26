@@ -8,10 +8,11 @@ import {
   type LocalStorePort,
   type SyncReport,
 } from '@kavanu/core';
-import { AuthRequiredError, GoogleAuth } from './platform/googleAuth';
+import { AuthRequiredError, GoogleAuth, type AccessTokenSource } from './platform/googleAuth';
 import { GoogleDrive } from './platform/googleDrive';
 import { GoogleGroupFiles } from './platform/googleGroupFiles';
 import { IdbStore } from './platform/idbStore';
+import { NativeGoogleAuth } from './platform/nativeGoogleAuth';
 import { createNotifier, isNative, type Notifier } from './platform/notifications';
 
 export type SyncStatus =
@@ -33,10 +34,10 @@ const INTERVAL_MS = 5 * 60_000;
 export class SyncController {
   private status: SyncStatus;
   private listeners = new Set<() => void>();
-  private auth: GoogleAuth | null = null;
+  private readonly auth: AccessTokenSource | null;
   private drive: GoogleDrive | null = null;
   private engine: SyncEngine | null = null;
-  /** Present only when a Google client ID is configured. */
+  /** Present only when Google sign-in is configured. */
   groups: GroupManager | null = null;
   groupFiles: GoogleGroupFiles | null = null;
   /** Drive permission id of the connected account, once known. */
@@ -47,16 +48,17 @@ export class SyncController {
   constructor(
     private readonly repo: Repository,
     private readonly store: LocalStorePort,
-    clientId: string | undefined,
+    auth: AccessTokenSource | null,
   ) {
-    if (!clientId) {
+    this.auth = auth;
+    if (!auth) {
       this.status = { state: 'unconfigured' };
       return;
     }
-    this.auth = new GoogleAuth(clientId);
-    this.drive = new GoogleDrive(() => this.auth!.getAccessToken(false));
+    const token = () => auth.getAccessToken(false);
+    this.drive = new GoogleDrive(token);
     this.engine = new SyncEngine(repo, this.drive, store);
-    this.groupFiles = new GoogleGroupFiles(() => this.auth!.getAccessToken(false));
+    this.groupFiles = new GoogleGroupFiles(token);
     this.groups = new GroupManager(repo, store, this.groupFiles, () => toISODate(new Date()));
     this.status = { state: localStorage.getItem(CONNECTED_FLAG) ? 'needsReconnect' : 'disconnected' };
 
@@ -92,8 +94,15 @@ export class SyncController {
 
   async disconnect(): Promise<void> {
     localStorage.removeItem(CONNECTED_FLAG);
-    await this.auth?.signOut();
-    this.set({ state: 'disconnected' });
+    try {
+      await this.auth?.signOut();
+    } catch (err) {
+      // Sync is already off; a device that keeps its Google sign-in cached must not block
+      // disconnecting or deleting local data.
+      console.warn('Google sign-out failed', err);
+    } finally {
+      this.set({ state: 'disconnected' });
+    }
   }
 
   /** Silent attempt at startup; falls back to asking the user to reconnect. */
@@ -154,14 +163,25 @@ export interface Services {
   replanReminders(): void;
 }
 
+const PLATFORM = isNative ? 'android' : 'web';
+
 function deviceId(): string {
   const key = 'kavanu.deviceId';
   let id = localStorage.getItem(key);
   if (!id) {
-    id = `web_${crypto.randomUUID().slice(0, 8)}`;
+    id = `${PLATFORM}_${crypto.randomUUID().slice(0, 8)}`;
     localStorage.setItem(key, id);
   }
   return id;
+}
+
+/**
+ * Google blocks its browser sign-in inside an embedded web view, so the Android
+ * app asks Android itself for the token. Both use the same Web client ID.
+ */
+function createAuth(clientId: string | undefined): AccessTokenSource | null {
+  if (!clientId) return null;
+  return isNative ? new NativeGoogleAuth(clientId) : new GoogleAuth(clientId);
 }
 
 export async function createServices(): Promise<Services> {
@@ -176,7 +196,7 @@ export async function createServices(): Promise<Services> {
   await repo.load();
 
   if (!repo.manifestValue(`device:${id}`)) {
-    await repo.setManifestValue(`device:${id}`, { platform: 'web', label: navigator.userAgent.slice(0, 120) });
+    await repo.setManifestValue(`device:${id}`, { platform: PLATFORM, label: navigator.userAgent.slice(0, 120) });
   }
 
   // The weekly parasha differs between Israel and elsewhere; start from the interface language.
@@ -205,10 +225,7 @@ export async function createServices(): Promise<Services> {
   window.setInterval(replanReminders, 60 * 60_000);
   replanReminders();
 
-  // Google blocks its browser sign-in inside an embedded web view, so the Android
-  // build stays local-only until native Google authorization is added.
-  const clientId = isNative ? undefined : import.meta.env.VITE_GOOGLE_CLIENT_ID || undefined;
-  const sync = new SyncController(repo, store, clientId);
+  const sync = new SyncController(repo, store, createAuth(import.meta.env.VITE_GOOGLE_CLIENT_ID || undefined));
   await sync.groups?.load();
   void sync.resume();
 

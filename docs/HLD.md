@@ -53,7 +53,7 @@ flowchart LR
 | `apps/web/src/services.ts` | Builds the object graph, decides when to sync and re-plan reminders | The one composition root |
 | `apps/web/src/platform/` | Adapters: IndexedDB, Google sign-in, Drive REST, group files, Picker, notifications | The only code that calls browser, Google or Capacitor APIs |
 | `apps/web/src/views/` | Tracks, Calendar, Groups and Settings screens | Read from `Repository`, write through its methods |
-| `apps/web/android` | Capacitor shell around the same web build | Native notifications only; no Drive yet (below) |
+| `apps/web/android` | Capacitor shell around the same web build | Native notifications and native Google sign-in |
 
 ## Data flow
 
@@ -98,11 +98,16 @@ Build-time Vite variables (`apps/web/.env.example`), none of them secret:
 
 | Variable | Purpose | When missing |
 |---|---|---|
-| `VITE_GOOGLE_CLIENT_ID` | OAuth Web client for sign-in and Drive | Local-only mode: no sync, no groups |
+| `VITE_GOOGLE_CLIENT_ID` | OAuth Web client for sign-in and Drive, on the web and Android | Local-only mode: no sync, no groups |
 | `VITE_GOOGLE_API_KEY`, `VITE_GOOGLE_APP_ID` | Google Picker, for joining a group someone else created | Joining by link is unavailable |
 
-CI and the Pages deploy read them from repository variables. Vercel (`vercel.json`) reads its
-own project settings.
+CI, the Pages deploy and the Android release read them from repository variables. Vercel
+(`vercel.json`) reads its own project settings.
+
+The Android release (`.github/workflows/android.yml`) also needs the signing key as repository
+secrets: `ANDROID_KEYSTORE_B64` and `ANDROID_KEYSTORE_B64_2` (the keystore, base64, in two
+parts) and `ANDROID_KEY_PASSWORD`. It fails rather than sign with another key, because Google
+sign-in on Android only accepts the key registered on the Android OAuth client.
 
 ## Validation at the edge
 
@@ -117,7 +122,7 @@ understand.
 | Platform | Status |
 |---|---|
 | Web PWA | Built: local storage, Drive sync, groups, reminders while open |
-| Android (Capacitor) | Built, local-only: reminders fire while the app is closed. Drive sync is off because Google blocks its web sign-in inside a web view (`services.ts`) |
+| Android (Capacitor) | Built: reminders fire while the app is closed; Drive sync signs in through Android (`NativeGoogleAuth`), because Google blocks its web sign-in inside a web view. Joining another person's group needs the Picker inside the app, which has not been tried |
 | Desktop | Not built |
 
 ## Testing

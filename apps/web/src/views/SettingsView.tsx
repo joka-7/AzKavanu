@@ -16,9 +16,9 @@ export function SettingsView() {
   const message = (() => {
     switch (status.state) {
       case 'unconfigured':
-        return isNative ? t.driveNativePending : t.driveUnconfigured;
+        return isNative ? t.driveUnconfiguredNative : t.driveUnconfigured;
       case 'disconnected':
-        return t.driveDisconnected;
+        return isNative ? t.driveDisconnectedNative : t.driveDisconnected;
       case 'needsReconnect':
         return t.driveNeedsReconnect;
       case 'syncing':

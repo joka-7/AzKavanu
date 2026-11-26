@@ -130,16 +130,26 @@ schedules the difference.
 
 `createServices()` is the composition root: it opens `IdbStore` (falling back to
 `MemoryStore`), makes a per-browser device id, loads the `Repository`, wires reminder
-replanning, and builds a `SyncController` with the Google client ID (none on Android).
+replanning, and builds a `SyncController` with the token source from `createAuth` (none when no Google client ID is configured).
 
 `SyncController` status is a discriminated union: `unconfigured`, `disconnected`,
 `needsReconnect`, `syncing`, `synced`, `offline`, `accountMismatch`, `error`. Before syncing it
 binds the local replica to the Drive account (`meta:account`) and stops with
 `accountMismatch` if a different account connects, so two people's data never merge.
 
-`GoogleAuth` uses Google Identity Services' token model: access tokens of about an hour,
-held in memory only, renewed silently when Google allows it, else `needsReconnect`. A 401 from
-Drive raises `AuthRequiredError`; other failures raise `DriveHttpError` with the status.
+Tokens come from an `AccessTokenSource` (`getAccessToken(interactive)`, `invalidate`,
+`signOut`), chosen in `createAuth`:
+
+| Source | Platform | Behaviour |
+|---|---|---|
+| `GoogleAuth` | Browser | Google Identity Services' token model: tokens of about an hour, in memory only, renewed silently when Google allows it |
+| `NativeGoogleAuth` | Android | `@joka-07/capacitor-auth` over Credential Manager, asking for `drive.appdata`, `drive.file`, `email` and `profile`. Android renews a granted token without the user, 5 s before expiry; if the grant was removed, even a silent renewal shows Google's consent screen. Network and token-check failures stay ordinary errors |
+
+Both raise `AuthRequiredError` when Google needs the user again, which becomes
+`needsReconnect`. A 401 from Drive also raises `AuthRequiredError`; other failures raise
+`DriveHttpError` with the status. A failed sign-out on disconnect is logged and does not stop
+the disconnect. On Android the sign-in plugin keeps tokens in a SharedPreferences file that the
+backup rules (`res/xml/backup_rules.xml`, `data_extraction_rules.xml`) exclude from backups.
 
 ## Errors
 

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older. The sign-in plugin keeps Google tokens here; they must not reach backups. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="GOOGLE_LOGIN_F13oz0I_SHARED_PERF.xml" />
+</full-backup-content>
