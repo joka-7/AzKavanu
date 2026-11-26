@@ -1,0 +1,75 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Gitleaks (full history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A secret removed in a later commit is still in the history, and still
+          # valid until it is rotated.
+          fetch-depth: 0
+      # The CLI rather than gitleaks-action: the action lists PR commits through the
+      # GitHub API, which the default token can't do. It reads .gitleaksignore.
+      - run: |
+          docker run --rm -v "${{ github.workspace }}:/repo" \
+            ghcr.io/gitleaks/gitleaks:v8.18.4 detect --source=/repo --redact --verbose
+
+  npm-audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+
+  trivy:
+    name: Trivy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          skip-dirs: ".ai,.claude"
+          # A table in the log rather than SARIF: uploading SARIF needs code scanning,
+          # which on a private repository needs GitHub Advanced Security.
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          scanners: vuln
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v4
+        # The analysis runs, but on a private repository without GitHub Advanced
+        # Security the upload fails with "Code scanning is not enabled". Remove this
+        # once code scanning is on.
+        continue-on-error: true
