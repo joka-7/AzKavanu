@@ -48,7 +48,7 @@ function buildTalmud(): Curriculum {
     const name = daf.getName();
     const blatt = daf.getBlatt();
     if (i > 0 && name === units[0]!.section && String(blatt) === units[0]!.ref) break;
-    const he = new DafPage(name, blatt).render('he');
+    const he = new DafPage(name, blatt).render('he').replace(/[\u0591-\u05C7]/g, ''); // a few names come with vowel marks
     const cut = he.lastIndexOf(' דף ');
     units.push({
       section: name,

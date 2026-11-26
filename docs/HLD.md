@@ -12,9 +12,11 @@ to open, see [`STRUCTURE.md`](STRUCTURE.md); for per-module contracts, see [`LLD
 - Study tracks: about 20 fixed cycles (Daf Yomi, Mishna Yomi, Rambam, 929 and others) and the
   weekly parasha, Talmud or Mishnah at your own pace, numbered units, or plain counted sessions.
 - Schedules on weekdays, days of the month (Gregorian or Hebrew), or N times per week or month.
-- A calendar with per-day check-off, holidays and streaks; daily links (Sefaria built in, URL
-  templates otherwise).
-- Reminders.
+- A calendar with per-day check-off, holidays and streaks; daily links (Sefaria built in, Shas
+  Radar and Ot va-Ot for the studies they cover, URL templates otherwise), and a link of your own
+  for any one day.
+- Reminders, in the app or as a downloaded calendar file; adding a study to your own calendar
+  (a Google Calendar link or an `.ics` file).
 - Optional sync between the user's devices through their Google Drive.
 - Study groups: one shared Drive file per group, invitations by email, a seven-day view of
   each member's progress.

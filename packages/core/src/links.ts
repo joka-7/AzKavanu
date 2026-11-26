@@ -19,7 +19,7 @@ export function localizeUrl(url: string, locale: string | undefined): string {
   return url;
 }
 
-function safe(url: string | undefined): string | null {
+export function safe(url: string | undefined): string | null {
   if (!url) return null;
   try {
     // User-supplied templates are untrusted once synced: never emit javascript: or data: links.
@@ -50,6 +50,8 @@ function fill(template: string, session: Session): string {
 
 /** The session's main link. Links are resolved from the track and the day; they are never stored. */
 export function resolveLink(track: StudyTrack, session: Session, locale?: string): string | null {
+  const custom = safe(session.customUrl);
+  if (custom) return custom;
   if (track.link.provider === 'builtin') {
     const url = (locale === 'he' && session.builtinUrlHe) || session.builtinUrl;
     return safe(url && localizeUrl(url, locale));

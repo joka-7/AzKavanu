@@ -14,6 +14,7 @@ import {
   type StudyTrackInput,
 } from './model';
 import type { LocalStorePort } from './ports';
+import { safe } from './links';
 import { sessionOn, type ScheduleContext, type Session } from './schedule';
 
 const DOC_PREFIX = 'doc:';
@@ -113,7 +114,9 @@ export class Repository {
   });
 
   session(track: StudyTrack, date: ISODate): Session | null {
-    return sessionOn(track, date, this.context(track.id));
+    const s = sessionOn(track, date, this.context(track.id));
+    const custom = this.progress(track.id, date)?.link;
+    return s && custom ? { ...s, customUrl: custom } : s;
   }
 
   /** Sessions of all active tracks on a date. */
@@ -161,11 +164,42 @@ export class Repository {
     const prev = this.progress(trackId, date);
     const rec: ProgressRecord = {
       ...(prev?.note ? { note: prev.note } : {}),
+      ...(prev?.link ? { link: prev.link } : {}),
       done,
       ...(done ? { doneAt: new Date(this.clockNow()).toISOString() } : {}),
       hlc: this.clock.tick(),
     };
     await this.put(progressDocName(yearOf(date)), progressKey(trackId, date), rec);
+  }
+
+  /** Attach (or, with null, remove) a link for one day's session. Only http(s) links are accepted. */
+  async setSessionLink(trackId: string, date: ISODate, url: string | null): Promise<void> {
+    const prev = this.progress(trackId, date);
+    let clean: string | undefined;
+    if (url !== null && url.trim()) {
+      const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`;
+      clean = safe(withScheme) ?? undefined;
+      if (!clean) throw new Error('Invalid link');
+    }
+    const rec: ProgressRecord = {
+      done: prev?.done ?? false,
+      ...(prev?.doneAt ? { doneAt: prev.doneAt } : {}),
+      ...(prev?.note ? { note: prev.note } : {}),
+      ...(clean ? { link: clean } : {}),
+      hlc: this.clock.tick(),
+    };
+    await this.put(progressDocName(yearOf(date)), progressKey(trackId, date), rec);
+  }
+
+  /** Add a daily reminder to an existing track (it follows the track's own schedule). */
+  async addReminder(trackId: string, time: string, onlyIfNotDone = true): Promise<void> {
+    const track = this.track(trackId);
+    if (!track || track.reminders.length >= 10) return;
+    if (track.reminders.some((r) => r.time === time && r.onlyIfNotDone === onlyIfNotDone)) return;
+    await this.saveTrack({
+      ...track,
+      reminders: [...track.reminders, { id: `r_${crypto.randomUUID().slice(0, 8)}`, time, onlyIfNotDone }],
+    });
   }
 
   async setSetting(key: string, value: unknown): Promise<void> {
