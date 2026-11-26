@@ -100,14 +100,6 @@ export function EventPanel({ repo, track, date, onClose }: { repo: Repository; t
       {mode === 'recurring' && (
         <>
           <label className="field">
-            <span>{t.eventTitle}</span>
-            <input value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
-          </label>
-          <label className="field narrow">
-            <span>{t.eventDate}</span>
-            <input type="date" required value={first} onChange={(e) => setFirst(e.target.value)} />
-          </label>
-          <label className="field">
             <span>{t.eventRepeat}</span>
             <select value={kind} onChange={(e) => setKind(e.target.value as RepeatKind)}>
               {scheduleRepeat && <option value="schedule">{t.repeatSchedule}</option>}
@@ -135,40 +127,53 @@ export function EventPanel({ repo, track, date, onClose }: { repo: Repository; t
               ))}
             </div>
           )}
-          {repeats && (
-            <>
-              <label className="field narrow">
-                <span>{t.eventEnds}</span>
-                <select value={endType} onChange={(e) => setEndType(e.target.value as EventEnd['type'])}>
-                  <option value="never">{t.endNever}</option>
-                  <option value="until">{t.endOn}</option>
-                  <option value="count">{t.endAfter}</option>
-                </select>
+          <details className="more">
+            <summary>{t.moreOptions}</summary>
+            <div className="more-body">
+              <label className="field">
+                <span>{t.eventTitle}</span>
+                <input value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
               </label>
-              {endType === 'until' && (
-                <label className="field narrow">
-                  <span>{t.endOn}</span>
-                  <input type="date" required value={until} min={first} onChange={(e) => setUntil(e.target.value)} />
+              <label className="field narrow">
+                <span>{t.eventDate}</span>
+                <input type="date" required value={first} onChange={(e) => setFirst(e.target.value)} />
+              </label>
+              {repeats && (
+                <>
+                  <label className="field narrow">
+                    <span>{t.eventEnds}</span>
+                    <select value={endType} onChange={(e) => setEndType(e.target.value as EventEnd['type'])}>
+                      <option value="never">{t.endNever}</option>
+                      <option value="until">{t.endOn}</option>
+                      <option value="count">{t.endAfter}</option>
+                    </select>
+                  </label>
+                  {endType === 'until' && (
+                    <label className="field narrow">
+                      <span>{t.endOn}</span>
+                      <input type="date" required value={until} min={first} onChange={(e) => setUntil(e.target.value)} />
+                    </label>
+                  )}
+                  {endType === 'count' && (
+                    <label className="field narrow">
+                      <span>{t.endAfter}</span>
+                      <input type="number" min={1} max={999} value={count} onChange={(e) => setCount(e.target.value)} />
+                    </label>
+                  )}
+                </>
+              )}
+              <label className="field">
+                <span>{t.eventDetails}</span>
+                <textarea rows={3} maxLength={1000} value={details} onChange={(e) => setDetails(e.target.value)} />
+              </label>
+              {dayUrl && (
+                <label className="choice">
+                  <input type="checkbox" checked={withLink} onChange={(e) => setLinkChoice(e.target.checked)} /> {t.eventIncludeLink}
                 </label>
               )}
-              {endType === 'count' && (
-                <label className="field narrow">
-                  <span>{t.endAfter}</span>
-                  <input type="number" min={1} max={999} value={count} onChange={(e) => setCount(e.target.value)} />
-                </label>
-              )}
-            </>
-          )}
-          <label className="field">
-            <span>{t.eventDetails}</span>
-            <textarea rows={3} maxLength={1000} value={details} onChange={(e) => setDetails(e.target.value)} />
-          </label>
-          {dayUrl && (
-            <label className="choice">
-              <input type="checkbox" checked={withLink} onChange={(e) => setLinkChoice(e.target.checked)} /> {t.eventIncludeLink}
-            </label>
-          )}
-          {repeats && <span className="muted small">{t.eventRecurringNote}</span>}
+              {repeats && <span className="muted small">{t.eventRecurringNote}</span>}
+            </div>
+          </details>
         </>
       )}
 

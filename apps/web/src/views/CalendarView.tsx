@@ -87,6 +87,28 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
   const [reminderTime, setReminderTime] = useState('20:00');
   const [reminderOnlyIfNotDone, setReminderOnlyIfNotDone] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  // Whether the month grid is shown; a per-device preference, so it is kept in this browser only.
+  const [monthOpen, setMonthOpen] = useState(() => {
+    try {
+      return localStorage.getItem('azk.monthOpen') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const toggleMonth = () => {
+    setMonthOpen(!monthOpen);
+    try {
+      localStorage.setItem('azk.monthOpen', monthOpen ? '0' : '1');
+    } catch {
+      // Private mode: the choice just lasts for this visit.
+    }
+  };
+  /** Move the selected day, bringing the month view along with it. */
+  const moveDay = (delta: number) => {
+    const next = addDays(selected, delta);
+    setSelected(next);
+    setAnchor(next);
+  };
   const today = toISODate(new Date());
   const [selected, setSelected] = useState<ISODate>(today);
   const hebrew = repo.setting('calendar', locale === 'he' ? 'hebrew' : 'gregorian') === 'hebrew';
@@ -136,7 +158,17 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
             <p className="muted">{selectedOther}</p>
             {holidays && <p className="holiday">{holidays}</p>}
           </div>
-          {assigned.length > 0 && <span className="count">{t.doneOf(doneCount, assigned.length)}</span>}
+          <div className="day-side">
+            <div className="month-nav">
+              <button className="btn icon" aria-label={t.prevDay} onClick={() => moveDay(-1)}>
+                <span className="chev prev" aria-hidden="true" />
+              </button>
+              <button className="btn icon" aria-label={t.nextDay} onClick={() => moveDay(1)}>
+                <span className="chev next" aria-hidden="true" />
+              </button>
+            </div>
+            {assigned.length > 0 && <span className="count">{t.doneOf(doneCount, assigned.length)}</span>}
+          </div>
         </div>
 
         {tracks.length === 0 ? (
@@ -330,21 +362,28 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
             <p className="muted small">{month.subtitle}</p>
           </div>
           <div className="month-nav">
-            <button className="btn" onClick={() => void repo.setSetting('calendar', hebrew ? 'gregorian' : 'hebrew')}>
-              {hebrew ? t.calGregorian : t.calHebrew}
-            </button>
-            <button className="btn" onClick={goToday}>
-              {t.today}
-            </button>
-            <button className="btn icon" aria-label={t.prevMonth} onClick={() => setAnchor(addDays(month.first, -1))}>
-              <span className="chev prev" aria-hidden="true" />
-            </button>
-            <button className="btn icon" aria-label={t.nextMonth} onClick={() => setAnchor(addDays(month.last, 1))}>
-              <span className="chev next" aria-hidden="true" />
+            {monthOpen && (
+              <>
+                <button className="btn" onClick={() => void repo.setSetting('calendar', hebrew ? 'gregorian' : 'hebrew')}>
+                  {hebrew ? t.calGregorian : t.calHebrew}
+                </button>
+                <button className="btn" onClick={goToday}>
+                  {t.today}
+                </button>
+                <button className="btn icon" aria-label={t.prevMonth} onClick={() => setAnchor(addDays(month.first, -1))}>
+                  <span className="chev prev" aria-hidden="true" />
+                </button>
+                <button className="btn icon" aria-label={t.nextMonth} onClick={() => setAnchor(addDays(month.last, 1))}>
+                  <span className="chev next" aria-hidden="true" />
+                </button>
+              </>
+            )}
+            <button className="btn" aria-expanded={monthOpen} aria-controls="month-grid" onClick={toggleMonth}>
+              {monthOpen ? t.hideMonth : t.showMonth}
             </button>
           </div>
         </div>
-        <div className="grid" role="grid">
+        <div className="grid" role="grid" id="month-grid" hidden={!monthOpen}>
           {weekdayNames.map((w) => (
             <div key={w} className="weekday" role="columnheader">
               {w}
