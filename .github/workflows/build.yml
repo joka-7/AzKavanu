@@ -59,3 +59,16 @@ jobs:
         with:
           name: kavanu-debug-apk
           path: apps/web/android/app/build/outputs/apk/debug/app-debug.apk
+
+  docs:
+    name: Docs (repo map is current)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Fails with a diff when docs/STRUCTURE.md or the README tree no longer match the files.
+      - run: python .ai/skills/repo-tree/gen_tree.py --project . --check
