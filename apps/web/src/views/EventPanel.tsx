@@ -18,7 +18,23 @@ import { useLocale } from '../context';
 type RepeatKind = 'schedule' | 'none' | 'daily' | 'weekly' | 'monthly';
 
 /** Add one study to the user's own calendar, with details, a repeat rule and an alert. */
-export function EventPanel({ repo, track, date, onClose }: { repo: Repository; track: StudyTrack; date: ISODate; onClose: () => void }) {
+export function EventPanel({
+  repo,
+  track,
+  date,
+  onClose,
+  defaultTitle,
+  defaultDetails,
+  closeLabel,
+}: {
+  repo: Repository;
+  track: StudyTrack;
+  date: ISODate;
+  onClose: () => void;
+  defaultTitle?: string;
+  defaultDetails?: string;
+  closeLabel?: string;
+}) {
   const { locale, t } = useLocale();
   const session = repo.session(track, date);
   const dayUrl = session ? resolveLink(track, session, locale) : null;
@@ -28,7 +44,7 @@ export function EventPanel({ repo, track, date, onClose }: { repo: Repository; t
   const dow = new Date(`${date}T12:00:00`).getDay();
 
   const [mode, setMode] = useState<'recurring' | 'daily'>('recurring');
-  const [title, setTitle] = useState(track.title);
+  const [title, setTitle] = useState(defaultTitle ?? track.title);
   const [first, setFirst] = useState<ISODate>(date);
   const [start, setStart] = useState(track.time?.start ?? track.reminders[0]?.time ?? '20:00');
   const [end, setEnd] = useState(track.time?.end ?? '');
@@ -38,7 +54,7 @@ export function EventPanel({ repo, track, date, onClose }: { repo: Repository; t
   const [endType, setEndType] = useState<EventEnd['type']>('never');
   const [until, setUntil] = useState<ISODate>(date);
   const [count, setCount] = useState('10');
-  const [details, setDetails] = useState(track.notes ?? '');
+  const [details, setDetails] = useState(defaultDetails ?? track.notes ?? '');
   // null = automatic: a link to one day's page only makes sense on an event that does not repeat.
   const [linkChoice, setLinkChoice] = useState<boolean | null>(null);
   const [alarm, setAlarm] = useState('15');
@@ -225,7 +241,7 @@ export function EventPanel({ repo, track, date, onClose }: { repo: Repository; t
           </button>
         )}
         <button type="button" className="btn" onClick={onClose}>
-          {t.cancel}
+          {closeLabel ?? t.cancel}
         </button>
       </div>
     </form>
