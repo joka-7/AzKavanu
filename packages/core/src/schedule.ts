@@ -18,6 +18,8 @@ export interface Session {
   builtinUrl?: string;
   /** A Hebrew-language page for the same material, where it differs from the localised main link. */
   builtinUrlHe?: string;
+  /** A link the user attached to this day; takes priority over the built-in link. */
+  customUrl?: string;
   /** True for flexible tracks: the day is available for a session, not assigned one. */
   optional: boolean;
 }
