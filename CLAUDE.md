@@ -195,6 +195,7 @@ server of ours that could read it, and there must never be one.
 - APK locally: `npm run build && (cd apps/web && npx cap sync android) && (cd apps/web/android && ./gradlew assembleDebug)`
 - Regenerate the repo map after adding, renaming or deleting a file: `python .ai/skills/repo-tree/gen_tree.py --project .`
 - Regenerate AI config after editing `ai-config.*`: `python .ai/bin/ai-sync`
+- Regenerate every icon and splash screen after changing the logo masters in `apps/web/icon/`: `python scripts/gen-icons.py`
 
 ### Invariants
 - **No backend.** Don't add a server, a database, analytics or any third-party script beyond
@@ -212,6 +213,9 @@ server of ours that could read it, and there must never be one.
 - **Every user-facing string goes through `apps/web/src/i18n.ts`** in English and Hebrew;
   layouts must work right-to-left.
 - Access tokens stay in memory on the web; never write them to storage or logs.
+- **The privacy policy (`apps/web/public/privacy.html`) states what leaves the device.** A change that
+  sends data anywhere new, or shows group members anything new, updates it (both languages) in the
+  same commit.
 
 ### Conventions
 - **Never add Claude attribution** to commits or PRs: no `Co-Authored-By: Claude`, no session/chat URL.
