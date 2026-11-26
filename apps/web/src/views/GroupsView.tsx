@@ -1,8 +1,10 @@
-import { GroupFullError, type GroupPreview, type GroupView } from '@kavanu/core';
+import { GroupFullError, toISODate, type GroupPreview, type GroupView } from '@kavanu/core';
 import { useState } from 'react';
 import { useGroups, useLocale, useRepo, useServices, useSyncStatus } from '../context';
 import { describeSchedule } from '../describe';
 import { DriveHttpError } from '../platform/googleDrive';
+import { isNative } from '../platform/notifications';
+import { EventPanel } from './EventPanel';
 import { grantFileAccess, pickerAvailable } from '../platform/picker';
 
 interface Props {
@@ -21,6 +23,8 @@ export function GroupsView({ joinFile, onJoinHandled, onOpenSettings }: Props) {
   const groups = useGroups();
   const status = useSyncStatus();
   const [creating, setCreating] = useState(false);
+  /** A group just created or joined, whose study we offer to put in the calendar. */
+  const [calendarPrompt, setCalendarPrompt] = useState<string | null>(null);
 
   if (!groups) return <section className="card"><p>{t.groupsUnavailable}</p></section>;
   if (!sync.connected || status.state === 'needsReconnect') {
@@ -38,9 +42,15 @@ export function GroupsView({ joinFile, onJoinHandled, onOpenSettings }: Props) {
   const list = groups.groups();
   return (
     <div className="stack wide">
-      {joinFile && <JoinPanel fileId={joinFile} onDone={onJoinHandled} />}
+      {calendarPrompt && !isNative && <CalendarPrompt groupId={calendarPrompt} onClose={() => setCalendarPrompt(null)} />}
+      {joinFile && <JoinPanel fileId={joinFile} onDone={onJoinHandled} onJoined={setCalendarPrompt} />}
       {creating ? (
-        <CreatePanel onDone={() => setCreating(false)} />
+        <CreatePanel
+          onDone={(createdId) => {
+            setCreating(false);
+            if (createdId) setCalendarPrompt(createdId);
+          }}
+        />
       ) : (
         <div className="list-head">
           <h2>{t.navGroups}</h2>
@@ -57,7 +67,7 @@ export function GroupsView({ joinFile, onJoinHandled, onOpenSettings }: Props) {
   );
 }
 
-function CreatePanel({ onDone }: { onDone: () => void }) {
+function CreatePanel({ onDone }: { onDone: (createdId?: string) => void }) {
   const repo = useRepo();
   const groups = useGroups()!;
   const { t } = useLocale();
@@ -74,7 +84,7 @@ function CreatePanel({ onDone }: { onDone: () => void }) {
     return (
       <section className="card">
         <p>{t.groupNeedsTrack}</p>
-        <button className="btn" onClick={onDone}>
+        <button className="btn" onClick={() => onDone()}>
           {t.cancel}
         </button>
       </section>
@@ -87,14 +97,14 @@ function CreatePanel({ onDone }: { onDone: () => void }) {
     try {
       await repo.setSetting('displayName', displayName.trim());
       const max = Math.floor(Number(maxMembers));
-      await groups.createGroup({
+      const id = await groups.createGroup({
         name,
         displayName,
         trackId,
         description,
         ...(max >= 2 ? { maxMembers: Math.min(100, max) } : {}),
       });
-      onDone();
+      onDone(id);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);
@@ -142,7 +152,7 @@ function CreatePanel({ onDone }: { onDone: () => void }) {
         <button type="submit" className="btn primary" disabled={busy}>
           {t.create}
         </button>
-        <button type="button" className="btn" onClick={onDone}>
+        <button type="button" className="btn" onClick={() => onDone()}>
           {t.cancel}
         </button>
       </div>
@@ -150,7 +160,7 @@ function CreatePanel({ onDone }: { onDone: () => void }) {
   );
 }
 
-function JoinPanel({ fileId, onDone }: { fileId: string; onDone: () => void }) {
+function JoinPanel({ fileId, onDone, onJoined }: { fileId: string; onDone: () => void; onJoined: (groupId: string) => void }) {
   const repo = useRepo();
   const groups = useGroups()!;
   const { sync } = useServices();
@@ -185,7 +195,8 @@ function JoinPanel({ fileId, onDone }: { fileId: string; onDone: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await groups.joinGroup({ fileId, displayName, trackId: trackId || null });
+      const id = await groups.joinGroup({ fileId, displayName, trackId: trackId || null });
+      onJoined(id);
       onDone();
     } catch (err) {
       setError(err instanceof GroupFullError ? t.groupFull : err instanceof Error ? err.message : String(err));
@@ -250,6 +261,31 @@ function JoinPanel({ fileId, onDone }: { fileId: string; onDone: () => void }) {
   );
 }
 
+/** Right after creating or joining: offer to put the group's study in the calendar. */
+function CalendarPrompt({ groupId, onClose }: { groupId: string; onClose: () => void }) {
+  const repo = useRepo();
+  const groups = useGroups()!;
+  const { t } = useLocale();
+  const membership = repo.memberships()[groupId];
+  const track = membership ? repo.track(membership.trackId) : undefined;
+  const group = groups.groups().find((g) => g.id === groupId);
+  if (!track) return null;
+  return (
+    <section className="card">
+      <h2>{t.groupCalendarPrompt}</h2>
+      <EventPanel
+        repo={repo}
+        track={track}
+        date={toISODate(new Date())}
+        defaultTitle={group?.name ?? track.title}
+        defaultDetails={group?.description ?? track.notes ?? ''}
+        closeLabel={t.notNow}
+        onClose={onClose}
+      />
+    </section>
+  );
+}
+
 function GroupCard({ group }: { group: GroupView }) {
   const groups = useGroups()!;
   const { sync } = useServices();
@@ -258,6 +294,9 @@ function GroupCard({ group }: { group: GroupView }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const repo = useRepo();
+  const myTrack = repo.track(repo.memberships()[group.id]?.trackId ?? '');
   const owner = group.role === 'owner';
   const link = inviteLink(group.driveFileId);
   const dayFmt = new Intl.DateTimeFormat(locale === 'he' ? 'he-IL' : 'en-GB', { weekday: 'narrow' });
@@ -394,10 +433,25 @@ function GroupCard({ group }: { group: GroupView }) {
             </a>
           </>
         )}
+        {!isNative && myTrack && (
+          <button className="btn" aria-expanded={calendarOpen} onClick={() => setCalendarOpen(!calendarOpen)}>
+            {t.addToCalendarBtn}
+          </button>
+        )}
         <button className="btn danger" disabled={busy} onClick={() => void (owner ? remove() : leave())}>
           {owner ? t.deleteGroup : t.leaveGroup}
         </button>
       </div>
+      {calendarOpen && myTrack && (
+        <EventPanel
+          repo={repo}
+          track={myTrack}
+          date={toISODate(new Date())}
+          defaultTitle={group.name}
+          defaultDetails={group.description ?? myTrack.notes ?? ''}
+          onClose={() => setCalendarOpen(false)}
+        />
+      )}
     </section>
   );
 }

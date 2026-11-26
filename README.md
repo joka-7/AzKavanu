@@ -18,6 +18,8 @@ Implemented (architecture phases 1a and 1b):
 - Local-first storage in IndexedDB, installable as a PWA, English and Hebrew (RTL)
 - Google Drive sync into the hidden app-data folder, with per-record merge between devices
 - Every day's study has a Done button, an add-or-change link control (for when no link is found or you prefer your own page) and a quick reminder
+- Direct links into the author's own study apps: Talmud days (Daf Yomi, Amud Yomi, Daf Weekly, own-pace Talmud) open the page in Shas Radar; Nach Yomi, 929, Tanakh Yomi, Tehillim and the weekly parasha open the chapter in אות ואות. The two addresses are set in `packages/core/src/apps.ts`.
+- Add a study to your own calendar with details, a repeat rule (the track's own schedule, daily, weekly, monthly; ends never, on a date or after N times) and an alert, either as one repeating event (Google Calendar link or calendar file) or as a separate event per day carrying that day's study and link
 - Reminders: while the app is open, or as a downloadable calendar file that fires with the app closed on any phone or computer (the Android app schedules them itself)
 - Study groups on any track: one shared Drive file per group, invitations by email, an optional description and maximum size, a seven-day view of each member's progress
 

@@ -5,6 +5,7 @@ import {
   parseISODate,
   occurrence,
   periodProgress,
+  resolveAppLinks,
   resolveExtraLinks,
   resolveLink,
   toISODate,
@@ -17,6 +18,7 @@ import { useMemo, useState } from 'react';
 import { downloadCalendarFile } from '../calendarFile';
 import { useLocale, useRepo, useServices } from '../context';
 import { isNative } from '../platform/notifications';
+import { EventPanel } from './EventPanel';
 
 /** Consecutive assigned sessions completed, counting back from today (today may still be open). */
 function streak(repo: Repository, track: StudyTrack, today: ISODate): number {
@@ -80,11 +82,35 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
   const repo = useRepo();
   const { notifier } = useServices();
   const { locale, t } = useLocale();
-  const [panel, setPanel] = useState<{ trackId: string; kind: 'link' | 'reminder' } | null>(null);
+  const [panel, setPanel] = useState<{ trackId: string; kind: 'link' | 'reminder' | 'event' } | null>(null);
+  /** The study whose secondary actions (link, reminder, calendar) are showing. */
+  const [moreFor, setMoreFor] = useState<string | null>(null);
   const [linkText, setLinkText] = useState('');
   const [reminderTime, setReminderTime] = useState('20:00');
   const [reminderOnlyIfNotDone, setReminderOnlyIfNotDone] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  // Whether the month grid is shown; a per-device preference, so it is kept in this browser only.
+  const [monthOpen, setMonthOpen] = useState(() => {
+    try {
+      return localStorage.getItem('azk.monthOpen') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const toggleMonth = () => {
+    setMonthOpen(!monthOpen);
+    try {
+      localStorage.setItem('azk.monthOpen', monthOpen ? '0' : '1');
+    } catch {
+      // Private mode: the choice just lasts for this visit.
+    }
+  };
+  /** Move the selected day, bringing the month view along with it. */
+  const moveDay = (delta: number) => {
+    const next = addDays(selected, delta);
+    setSelected(next);
+    setAnchor(next);
+  };
   const today = toISODate(new Date());
   const [selected, setSelected] = useState<ISODate>(today);
   const hebrew = repo.setting('calendar', locale === 'he' ? 'hebrew' : 'gregorian') === 'hebrew';
@@ -134,7 +160,17 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
             <p className="muted">{selectedOther}</p>
             {holidays && <p className="holiday">{holidays}</p>}
           </div>
-          {assigned.length > 0 && <span className="count">{t.doneOf(doneCount, assigned.length)}</span>}
+          <div className="day-side">
+            <div className="month-nav">
+              <button className="btn icon" aria-label={t.prevDay} onClick={() => moveDay(-1)}>
+                <span className="chev prev" aria-hidden="true" />
+              </button>
+              <button className="btn icon" aria-label={t.nextDay} onClick={() => moveDay(1)}>
+                <span className="chev next" aria-hidden="true" />
+              </button>
+            </div>
+            {assigned.length > 0 && <span className="count">{t.doneOf(doneCount, assigned.length)}</span>}
+          </div>
         </div>
 
         {tracks.length === 0 ? (
@@ -153,11 +189,12 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
               const done = repo.isDone(track.id, selected);
               const url = resolveLink(track, s, locale);
               const extra = resolveExtraLinks(track, s, locale);
+              const appLinks = resolveAppLinks(s);
               const run = s.optional ? 0 : streak(repo, track, today);
               const quota = periodProgress(track.schedule, selected, repo.doneDates(track.id));
               const open = panel?.trackId === track.id ? panel.kind : null;
               const times = track.reminders.map((r) => r.time).sort().join(', ');
-              const togglePanel = (kind: 'link' | 'reminder') => {
+              const togglePanel = (kind: 'link' | 'reminder' | 'event') => {
                 setMessage(null);
                 if (open === kind) return setPanel(null);
                 setPanel({ trackId: track.id, kind });
@@ -198,18 +235,54 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
                         {t.open}
                       </a>
                     )}
+                    {appLinks.map((l) => (
+                      <a key={l.app} className="btn" href={l.url} target="_blank" rel="noopener noreferrer">
+                        {l.app === 'shasRadar' ? t.appShasRadar : t.appOtVaOt}
+                      </a>
+                    ))}
                     {extra.map((l) => (
                       <a key={l.label + l.url} className="btn" href={l.url} target="_blank" rel="noopener noreferrer">
                         {l.label}
                       </a>
                     ))}
-                    <button className="btn" aria-expanded={open === 'link'} onClick={() => togglePanel('link')}>
-                      {url ? t.changeLink : t.addLink}
-                    </button>
-                    <button className="btn" aria-expanded={open === 'reminder'} onClick={() => togglePanel('reminder')}>
-                      {t.remindMe}
+                    {!url && (
+                      <button className="btn" aria-expanded={open === 'link'} onClick={() => togglePanel('link')}>
+                        {t.addLink}
+                      </button>
+                    )}
+                    <button
+                      className="btn"
+                      aria-expanded={moreFor === track.id}
+                      aria-controls={`more-${track.id}`}
+                      onClick={() => {
+                        setMessage(null);
+                        if (moreFor === track.id) setPanel(null);
+                        setMoreFor(moreFor === track.id ? null : track.id);
+                      }}
+                    >
+                      {t.moreActions}
                     </button>
                   </div>
+
+                  {moreFor === track.id && (
+                    <div className="session-actions session-more" id={`more-${track.id}`}>
+                      {url && (
+                        <button className="btn" aria-expanded={open === 'link'} onClick={() => togglePanel('link')}>
+                          {t.changeLink}
+                        </button>
+                      )}
+                      <button className="btn" aria-expanded={open === 'reminder'} onClick={() => togglePanel('reminder')}>
+                        {t.remindMe}
+                      </button>
+                      {!isNative && (
+                        <button className="btn" aria-expanded={open === 'event'} onClick={() => togglePanel('event')}>
+                          {t.addToCalendarBtn}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {open === 'event' && <EventPanel repo={repo} track={track} date={selected} onClose={() => setPanel(null)} />}
 
                   {open === 'link' && (
                     <form
@@ -315,21 +388,28 @@ export function CalendarView({ onAddTrack }: { onAddTrack: () => void }) {
             <p className="muted small">{month.subtitle}</p>
           </div>
           <div className="month-nav">
-            <button className="btn" onClick={() => void repo.setSetting('calendar', hebrew ? 'gregorian' : 'hebrew')}>
-              {hebrew ? t.calGregorian : t.calHebrew}
-            </button>
-            <button className="btn" onClick={goToday}>
-              {t.today}
-            </button>
-            <button className="btn icon" aria-label={t.prevMonth} onClick={() => setAnchor(addDays(month.first, -1))}>
-              <span className="chev prev" aria-hidden="true" />
-            </button>
-            <button className="btn icon" aria-label={t.nextMonth} onClick={() => setAnchor(addDays(month.last, 1))}>
-              <span className="chev next" aria-hidden="true" />
+            {monthOpen && (
+              <>
+                <button className="btn" onClick={() => void repo.setSetting('calendar', hebrew ? 'gregorian' : 'hebrew')}>
+                  {hebrew ? t.calGregorian : t.calHebrew}
+                </button>
+                <button className="btn" onClick={goToday}>
+                  {t.today}
+                </button>
+                <button className="btn icon" aria-label={t.prevMonth} onClick={() => setAnchor(addDays(month.first, -1))}>
+                  <span className="chev prev" aria-hidden="true" />
+                </button>
+                <button className="btn icon" aria-label={t.nextMonth} onClick={() => setAnchor(addDays(month.last, 1))}>
+                  <span className="chev next" aria-hidden="true" />
+                </button>
+              </>
+            )}
+            <button className="btn" aria-expanded={monthOpen} aria-controls="month-grid" onClick={toggleMonth}>
+              {monthOpen ? t.hideMonth : t.showMonth}
             </button>
           </div>
         </div>
-        <div className="grid" role="grid">
+        <div className="grid" role="grid" id="month-grid" hidden={!monthOpen}>
           {weekdayNames.map((w) => (
             <div key={w} className="weekday" role="columnheader">
               {w}

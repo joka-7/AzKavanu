@@ -209,3 +209,15 @@ textarea { font: inherit; color: inherit; border: 1px solid var(--line); border-
 .session-panel { flex-basis: 100%; display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
 .actions.tight { margin-top: 2px; }
 .track-list li { flex-wrap: wrap; }
+
+.event-panel .row.times { grid-template-columns: repeat(2, minmax(0, 150px)); }
+.event-panel .actions .btn.primary { text-decoration: none; }
+
+/* Collapsible parts */
+.day-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.grid[hidden] { display: none; }
+.more { border-top: 1px solid var(--line); padding-top: 8px; }
+.more > summary { cursor: pointer; color: var(--accent); font-weight: 600; padding: 4px 0; }
+.more-body { display: grid; gap: 8px; margin-top: 8px; }
+
+.session-more { margin-top: -2px; }

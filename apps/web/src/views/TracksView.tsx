@@ -11,7 +11,6 @@ import {
 } from '@kavanu/core';
 import { gematriya } from '@hebcal/core';
 import { useState } from 'react';
-import { downloadCalendarFile } from '../calendarFile';
 import { useLocale, useRepo } from '../context';
 import { isNative } from '../platform/notifications';
 import { describeSchedule, weekdayNames } from '../describe';
@@ -731,11 +730,6 @@ export function TracksView() {
                 <span className="session-title">{tr.title}</span>
                 <span className="muted">{describeSchedule(tr.schedule, t, cycles, locale)}</span>
               </div>
-              {!isNative && tr.reminders.length > 0 && (
-                <button className="btn" title={t.calendarHint} onClick={() => downloadCalendarFile(repo, tr, locale, t.appName)}>
-                  {t.addToCalendar}
-                </button>
-              )}
               <button className="btn" onClick={() => setDraft(toDraft(tr))}>
                 {t.edit}
               </button>
