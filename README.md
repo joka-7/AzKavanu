@@ -17,7 +17,8 @@ Implemented (architecture phases 1a and 1b):
 - Daily links: built-in Sefaria links for the fixed cycles, URL templates for everything else
 - Local-first storage in IndexedDB, installable as a PWA, English and Hebrew (RTL)
 - Google Drive sync into the hidden app-data folder, with per-record merge between devices
-- Reminders while the app is open
+- Every day's study has a Done button, an add-or-change link control (for when no link is found or you prefer your own page) and a quick reminder
+- Reminders: while the app is open, or as a downloadable calendar file that fires with the app closed on any phone or computer (the Android app schedules them itself)
 - Study groups on any track: one shared Drive file per group, invitations by email, an optional description and maximum size, a seven-day view of each member's progress
 
 - Android app (Capacitor shell): the same interface, with reminders that fire while the app is closed. It is local-only for now, because Google sign-in needs a native implementation on Android.

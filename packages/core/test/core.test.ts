@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   FIXED_CYCLES,
+  buildIcs,
   resolveExtraLinks,
   HlcClock,
   getCurriculum,
@@ -372,5 +373,32 @@ describe('Hebrew links and extra resources', () => {
     expect(resolveExtraLinks(t, sessionOn(t, '2026-11-11')!)).toEqual([
       { label: 'Audio', url: 'https://example.org/shiur?daf=Bekhorot.54a&d=2026-11-11' },
     ]);
+  });
+});
+
+describe('calendar file', () => {
+  it('writes one event with an alarm per reminder, folded and escaped', () => {
+    const t: StudyTrack = { ...daf, reminders: [{ id: 'r1', time: '06:30', onlyIfNotDone: false }] };
+    const plan = planReminders([t], () => ({}), toLocalDate('2026-11-10', 12, 0), { windowDays: 2, locale: 'he' });
+    const ics = buildIcs(plan, 'דף יומי, קבענו', Date.UTC(2026, 10, 10));
+    expect(ics.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true);
+    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(1); // 10 Nov 06:30 already passed; only the 11th
+    expect(ics).toContain('DTSTART:20261111T063000');
+    expect(ics).toContain('TRIGGER:PT0M');
+    expect(ics).toContain('UID:t_daf|2026-11-11|r1@az-kavanu');
+    expect(ics).toContain('X-WR-CALNAME:דף יומי\\, קבענו');
+    for (const line of ics.split('\r\n')) expect(new TextEncoder().encode(line).length).toBeLessThanOrEqual(75);
+    // Unfolding restores the whole summary, including multi-byte Hebrew.
+    expect(ics.replace(/\r\n /g, '')).toContain('SUMMARY:Daf Yomi: בכורות');
+  });
+});
+
+describe('links the user attaches', () => {
+  const cyc: StudyTrack = { ...daf, id: 'x', link: { provider: 'none' } };
+  it('a custom link wins over everything and must be http(s)', () => {
+    const s = { ...sessionOn(daf, '2026-11-11')!, customUrl: 'https://example.org/my-shiur' };
+    expect(resolveLink(daf, s, 'he')).toBe('https://example.org/my-shiur');
+    expect(resolveLink(cyc, { ...s, customUrl: 'javascript:alert(1)' })).toBeNull();
+    expect(resolveLink(cyc, { ...s, customUrl: undefined })).toBeNull();
   });
 });

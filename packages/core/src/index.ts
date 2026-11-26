@@ -11,3 +11,4 @@ export * from './repository';
 export * from './sync';
 export * from './memory';
 export * from './groups';
+export * from './ics';
