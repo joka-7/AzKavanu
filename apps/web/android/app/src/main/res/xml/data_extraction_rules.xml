@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and newer. The sign-in plugin keeps Google tokens here; they must not reach backups or device transfers. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="GOOGLE_LOGIN_F13oz0I_SHARED_PERF.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="GOOGLE_LOGIN_F13oz0I_SHARED_PERF.xml" />
+    </device-transfer>
+</data-extraction-rules>

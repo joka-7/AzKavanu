@@ -13,7 +13,9 @@
     "@capacitor/android": "^8.6.0",
     "@capacitor/core": "^8.6.0",
     "@capacitor/local-notifications": "^8.3.1",
+    "@capgo/capacitor-social-login": "^8.7.13",
     "@hebcal/core": "^6.16.0",
+    "@joka-07/capacitor-auth": "^0.2.0",
     "@kavanu/core": "*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

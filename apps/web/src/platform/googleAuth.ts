@@ -32,6 +32,15 @@ declare global {
   }
 }
 
+/** Where Drive access tokens come from: Google's browser popup, or Android itself. */
+export interface AccessTokenSource {
+  /** `interactive` may show Google UI, so pass true only from a user gesture. */
+  getAccessToken(interactive: boolean): Promise<string>;
+  /** Forget the cached token, after Drive rejected it. */
+  invalidate(): void;
+  signOut(): Promise<void>;
+}
+
 export class AuthRequiredError extends Error {
   constructor(message = 'Google sign-in required') {
     super(message);
@@ -54,7 +63,7 @@ function loadGis(): Promise<void> {
   return gisLoading;
 }
 
-export class GoogleAuth {
+export class GoogleAuth implements AccessTokenSource {
   private token: string | null = null;
   private expiresAt = 0;
 
