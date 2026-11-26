@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Kavanu</string>
-    <string name="title_activity_main">Kavanu</string>
+    <string name="app_name">Az Kavanu</string>
+    <string name="title_activity_main">Az Kavanu</string>
     <string name="package_name">app.kavanu</string>
     <string name="custom_url_scheme">app.kavanu</string>
 </resources>
