@@ -1,0 +1,112 @@
+name: Android release
+
+# On every push to main: builds the Android app, signs it with the app's permanent
+# key and publishes it as a GitHub release, so the latest APK is always at
+#   https://github.com/joka-7/AzKavanu/releases/latest/download/AzKavanu.apk
+# Pull requests still get an unsigned debug APK from the Build workflow.
+#
+# Google sign-in on Android only works for an APK signed with the key whose SHA-1
+# is registered on the Android OAuth client, so this never falls back to a
+# temporary key: missing or wrong signing secrets fail the job.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+env:
+  APP_NAME: AzKavanu
+  KEY_ALIAS: azkavanu
+  VERSION_NAME: 1.0.${{ github.run_number }}
+
+jobs:
+  apk:
+    # A manual run from another branch would sign unreviewed code with the permanent key.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The write token is only for publishing; keep it out of .git/config while npm and Gradle run.
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # This workflow publishes on its own, so it does not rely on the Build workflow having passed.
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Build the web app into the Android project
+        run: |
+          # Without it the APK runs local-only, which must not ship as the latest release.
+          [ -n "$VITE_GOOGLE_CLIENT_ID" ] || { echo "::error::Repository variable VITE_GOOGLE_CLIENT_ID is not set."; exit 1; }
+          npm run build
+          cd apps/web && npx cap sync android
+        env:
+          # OAuth Web client ID and Picker settings: public by design, not secrets.
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_API_KEY: ${{ vars.VITE_GOOGLE_API_KEY }}
+          VITE_GOOGLE_APP_ID: ${{ vars.VITE_GOOGLE_APP_ID }}
+
+      - name: Build the unsigned release APK
+        working-directory: apps/web/android
+        run: ./gradlew --no-daemon assembleRelease -PversionCode=${{ github.run_number }} -PversionName=$VERSION_NAME
+
+      - name: Sign the APK
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_B64_2: ${{ secrets.ANDROID_KEYSTORE_B64_2 }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          # The keystore is split across two secrets: some clipboards cut long lines at 2000 characters.
+          KEYSTORE_B64="$KEYSTORE_B64$KEYSTORE_B64_2"
+          [ -n "$KEYSTORE_B64" ] || { echo "::error::ANDROID_KEYSTORE_B64 is not set. Add the signing secrets."; exit 1; }
+          printf '%s' "$KEYSTORE_B64" | tr -d ' \r\n\t' | base64 -d > release.jks 2>/dev/null \
+            || { echo "::error::ANDROID_KEYSTORE_B64 + ANDROID_KEYSTORE_B64_2 are not valid base64. Paste both again exactly."; exit 1; }
+          KEY_PASSWORD=$(printf '%s' "$KEY_PASSWORD" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          export KEY_PASSWORD
+          # Passwords go through the environment, never on a command line other processes can read.
+          keytool -list -keystore release.jks -storepass:env KEY_PASSWORD -alias "$KEY_ALIAS" > /dev/null 2>&1 \
+            || { echo "::error::ANDROID_KEY_PASSWORD does not open the keystore, or it has no '$KEY_ALIAS' key."; exit 1; }
+          echo "::notice::Signing key $(keytool -list -v -keystore release.jks -storepass:env KEY_PASSWORD -alias "$KEY_ALIAS" | grep -o 'SHA1:.*')"
+          # Newest stable build-tools (skip rc/preview directories).
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | grep -E '/[0-9]+(\.[0-9]+)*$' | sort -V | tail -1)
+          "$BT/zipalign" -f -p 4 apps/web/android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          "$BT/apksigner" sign --ks release.jks --ks-key-alias "$KEY_ALIAS" --ks-pass env:KEY_PASSWORD --key-pass env:KEY_PASSWORD \
+            --out "$APP_NAME.apk" aligned.apk
+          "$BT/apksigner" verify "$APP_NAME.apk"
+          rm -f release.jks aligned.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-${{ env.VERSION_NAME }}-apk
+          path: ${{ env.APP_NAME }}.apk
+
+      - name: Publish the APK as a release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # A re-run keeps the run number, so the release may already exist.
+          # No local credentials (persist-credentials: false), so name the repository.
+          export GH_REPO="$GITHUB_REPOSITORY"
+          if gh release view "android-$VERSION_NAME" > /dev/null 2>&1; then
+            gh release upload "android-$VERSION_NAME" "$APP_NAME.apk" --clobber
+          else
+            gh release create "android-$VERSION_NAME" "$APP_NAME.apk" --target "$GITHUB_SHA" --latest \
+              --title "$APP_NAME Android $VERSION_NAME" \
+              --notes "Android app built from $GITHUB_SHA. Install: download $APP_NAME.apk on the phone and open it (allow installing from this source when asked)."
+          fi
