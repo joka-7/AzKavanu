@@ -93,6 +93,9 @@ export function App() {
         )}
         {tab === 'settings' && <SettingsView />}
       </main>
+      <footer className="footer">
+        <a href={locale === 'he' ? './privacy.html#he' : './privacy.html'}>{t.privacy}</a>
+      </footer>
     </div>
   );
 }

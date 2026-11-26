@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="index" />
+    <title>Privacy — Az Kavanu · אז קבענו</title>
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <style>
+      body { font: 16px/1.6 system-ui, sans-serif; color: #1f2937; background: #f6f4ef; margin: 0; }
+      main { max-width: 42rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+      h1 { font-size: 1.75rem; margin: 0 0 .25rem; }
+      h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; }
+      a { color: #27408b; }
+      .updated { color: #4b5563; font-size: .9rem; margin: 0 0 1.5rem; }
+      hr { border: 0; border-top: 1px solid #d6d3cc; margin: 3rem 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><a href="./">&larr; Back to Az Kavanu</a> · <a href="#he" lang="he">עברית</a></p>
+      <h1>Privacy</h1>
+      <p class="updated">Last updated 27 November 2026</p>
+
+      <p>
+        Az Kavanu tracks your study schedule in your browser or in the Android app. It has no
+        accounts of its own and no server or database that holds your data, so the person who
+        runs Az Kavanu cannot read it.
+      </p>
+
+      <h2>What stays on your device</h2>
+      <p>
+        Your tracks, the days you ticked, your reminders and your settings are saved on this
+        device (in the browser's or the app's local storage). Reminders are scheduled on the
+        device too. Nothing leaves it unless you connect Google Drive. Use
+        <strong>Export as JSON</strong> in Settings to keep a backup file.
+      </p>
+
+      <h2>Optional: sync with your Google Drive</h2>
+      <p>
+        If you choose <strong>Connect Google Drive</strong>, you sign in with Google and Az Kavanu
+        saves your data to a hidden app folder in your own Drive, so your devices stay in step.
+        It asks for two permissions: access to that hidden folder (<code>drive.appdata</code>),
+        and access to the files Az Kavanu itself creates or that you open with it
+        (<code>drive.file</code>), which study groups use. It cannot see, list or change any other
+        file in your Drive. Your sign-in token is kept in memory on the device and is never
+        stored or sent anywhere else.
+      </p>
+      <p>
+        Az Kavanu's use of information received from Google APIs adheres to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+        including the Limited Use requirements. Data from your Drive is used only to sync your
+        study data between your devices and with the groups you join.
+      </p>
+
+      <h2>Optional: study groups</h2>
+      <p>
+        A group is one file in a <em>Kavanu</em> folder in the Drive of the person who created it.
+        When you create a group and invite someone, Google shares that file with their email
+        address and sends them an email. Everyone in a group can see:
+      </p>
+      <ul>
+        <li>the group's name and description;</li>
+        <li>each member's display name, as they chose it;</li>
+        <li>on which days in the last 60 days each member completed the group's track.</li>
+      </ul>
+      <p>
+        Like any shared Drive file, the people it is shared with can also see each other's Google
+        account name and email address in Drive. Nothing else about you, such as your other
+        tracks, is written to a group.
+      </p>
+
+      <h2>Links you open</h2>
+      <p>
+        Tapping a day's study link opens that page (for example on Sefaria) in your browser.
+        That site then receives a normal page request and its own privacy terms apply.
+      </p>
+
+      <h2>The website</h2>
+      <p>
+        The site is a set of static files on GitHub Pages and Vercel. Like any web host, they may
+        keep standard request logs (such as your IP address). Az Kavanu itself does not use
+        analytics, advertising or tracking cookies.
+      </p>
+
+      <h2>Removing your data</h2>
+      <ul>
+        <li><strong>Delete local data</strong> in Settings removes everything on this device and disconnects Drive. Uninstalling the Android app, or clearing the site's data in your browser, does the same.</li>
+        <li>To delete what is in your Drive: in Google Drive, open <em>Settings &rarr; Manage apps</em>, find Az Kavanu and choose <em>Delete hidden app data</em>. Delete the <em>Kavanu</em> folder to remove the groups you created; the people you shared them with lose access.</li>
+        <li>To stop Az Kavanu reaching your Drive, remove it in your Google Account under <em>Security &rarr; Your connections to third-party apps and services</em>.</li>
+        <li>To leave a group, choose <strong>Leave group</strong>. Your completed days are removed from the group file; your display name stays there, marked as left, until the group's owner deletes the file.</li>
+      </ul>
+
+      <h2>Contact</h2>
+      <p>
+        Questions about privacy: <a href="mailto:joka.dev.7@gmail.com">joka.dev.7@gmail.com</a>.
+        If this page changes, the date above changes with it.
+      </p>
+
+      <hr />
+
+      <section id="he" lang="he" dir="rtl">
+        <p><a href="./">&rarr; חזרה לאז קבענו</a> · <a href="#" lang="en">English</a></p>
+        <h1>פרטיות</h1>
+        <p class="updated">עודכן לאחרונה: 27 בנובמבר 2026</p>
+
+        <p>
+          אז קבענו עוקבת אחר סדר הלימוד שלך בדפדפן או באפליקציית Android. אין לה חשבונות משלה ואין
+          לה שרת או מסד נתונים שמחזיקים את הנתונים שלך, ולכן מי שמפעיל את אז קבענו אינו יכול לקרוא אותם.
+        </p>
+
+        <h2>מה נשאר במכשיר שלך</h2>
+        <p>
+          המסלולים, הימים שסימנת, התזכורות וההגדרות נשמרים במכשיר זה (באחסון המקומי של הדפדפן או של
+          האפליקציה). גם התזכורות מתוזמנות במכשיר. דבר אינו יוצא ממנו אלא אם חיברת את Google Drive.
+          אפשר לשמור קובץ גיבוי באמצעות <strong>ייצוא כ־JSON</strong> בהגדרות.
+        </p>
+
+        <h2>אפשרי: סנכרון עם Google Drive שלך</h2>
+        <p>
+          אם בחרת <strong>חיבור ל־Google Drive</strong>, את/ה נכנס/ת עם Google, ואז קבענו שומרת את הנתונים
+          בתיקיית יישום נסתרת ב־Drive שלך כדי שהמכשירים שלך יישארו מעודכנים. היא מבקשת שתי הרשאות: גישה
+          לתיקייה הנסתרת (<code dir="ltr">drive.appdata</code>), וגישה לקבצים שאז קבענו עצמה יוצרת או
+          שפתחת באמצעותה (<code dir="ltr">drive.file</code>), שבהם משתמשות קבוצות הלימוד. היא אינה יכולה
+          לראות, לרשום או לשנות שום קובץ אחר ב־Drive שלך. אסימון הכניסה נשמר בזיכרון במכשיר בלבד, ואינו
+          נשמר או נשלח לשום מקום אחר.
+        </p>
+        <p>
+          השימוש של אז קבענו במידע שמתקבל מממשקי Google עומד ב־
+          <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+          כולל דרישות ה־Limited Use. נתונים מה־Drive שלך משמשים רק לסנכרון נתוני הלימוד בין המכשירים שלך
+          ועם הקבוצות שהצטרפת אליהן.
+        </p>
+
+        <h2>אפשרי: קבוצות לימוד</h2>
+        <p>
+          קבוצה היא קובץ אחד בתיקייה <em>Kavanu</em> ב־Drive של מי שיצר/ה אותה. כשיוצרים קבוצה ומזמינים
+          מישהו, Google משתפת את הקובץ עם כתובת הדוא״ל שלו ושולחת לו הודעה. כל חברי הקבוצה רואים:
+        </p>
+        <ul>
+          <li>את שם הקבוצה ותיאורה;</li>
+          <li>את שם התצוגה של כל חבר, כפי שבחר אותו;</li>
+          <li>באילו ימים ב־60 הימים האחרונים כל חבר השלים את מסלול הקבוצה.</li>
+        </ul>
+        <p>
+          כמו בכל קובץ משותף ב־Drive, מי שהקובץ משותף איתם יכולים לראות גם את שם חשבון Google וכתובת
+          הדוא״ל זה של זה ב־Drive. שום דבר אחר עליך, כמו המסלולים האחרים שלך, אינו נכתב לקבוצה.
+        </p>
+
+        <h2>קישורים שפתחת</h2>
+        <p>
+          לחיצה על קישור הלימוד של יום פותחת את הדף (למשל בספריא) בדפדפן. האתר מקבל בקשת דף רגילה, ותנאי
+          הפרטיות שלו חלים.
+        </p>
+
+        <h2>האתר</h2>
+        <p>
+          האתר הוא קבצים סטטיים ב־GitHub Pages וב־Vercel. כמו כל שירות אחסון, הם עשויים לשמור יומני
+          בקשות רגילים (כמו כתובת ה־IP שלך). אז קבענו עצמה אינה משתמשת באנליטיקה, בפרסום או בעוגיות מעקב.
+        </p>
+
+        <h2>מחיקת הנתונים שלך</h2>
+        <ul>
+          <li><strong>מחיקת נתונים מקומיים</strong> בהגדרות מוחקת את כל מה שבמכשיר זה ומנתקת את Drive. הסרת אפליקציית Android, או ניקוי נתוני האתר בדפדפן, עושים אותו דבר.</li>
+          <li>כדי למחוק את מה שב־Drive שלך: ב־Google Drive פותחים <em>הגדרות &larr; ניהול אפליקציות</em>, מוצאים את אז קבענו ובוחרים <em>מחיקת נתוני אפליקציה מוסתרים</em>. מחיקת התיקייה <em>Kavanu</em> מסירה את הקבוצות שיצרת, ומי ששיתפת איתם מאבדים גישה.</li>
+          <li>כדי למנוע מאז קבענו גישה ל־Drive שלך, מסירים אותה בחשבון Google תחת <em>אבטחה &larr; החיבורים שלך לאפליקציות ושירותים של צד שלישי</em>.</li>
+          <li>כדי לעזוב קבוצה בוחרים <strong>עזיבת הקבוצה</strong>. הימים שהשלמת נמחקים מקובץ הקבוצה; שם התצוגה שלך נשאר בו, מסומן כמי שעזב, עד שבעלי הקבוצה מוחקים את הקובץ.</li>
+        </ul>
+
+        <h2>יצירת קשר</h2>
+        <p>
+          שאלות על פרטיות: <a href="mailto:joka.dev.7@gmail.com" dir="ltr">joka.dev.7@gmail.com</a>.
+          אם הדף הזה ישתנה, התאריך שלמעלה ישתנה איתו.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
