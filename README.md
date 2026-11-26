@@ -1,4 +1,4 @@
-# Kavanu
+# Az Kavanu · אז קבענו
 
 Study tracking and scheduling with no backend: your data lives in your own Google Drive, and the app works offline.
 

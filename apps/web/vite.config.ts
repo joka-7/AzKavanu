@@ -15,8 +15,8 @@ export default defineConfig({
         importScripts: ['sw-notify.js'],
       },
       manifest: {
-        name: 'Kavanu',
-        short_name: 'Kavanu',
+        name: 'Az Kavanu · אז קבענו',
+        short_name: 'Az Kavanu',
         description: 'Study tracking and scheduling, stored in your own Google Drive.',
         theme_color: '#27408b',
         background_color: '#f6f4ef',
