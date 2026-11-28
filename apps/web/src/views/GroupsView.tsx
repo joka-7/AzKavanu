@@ -2,6 +2,7 @@ import { GroupFullError, toISODate, type GroupPreview, type GroupView } from '@k
 import { useState } from 'react';
 import { useGroups, useLocale, useRepo, useServices, useSyncStatus } from '../context';
 import { describeSchedule } from '../describe';
+import { AuthRequiredError } from '../platform/googleAuth';
 import { DriveHttpError } from '../platform/googleDrive';
 import { isNative } from '../platform/notifications';
 import { EventPanel } from './EventPanel';
@@ -25,6 +26,7 @@ export function GroupsView({ joinFile, onJoinHandled, onOpenSettings }: Props) {
   const [creating, setCreating] = useState(false);
   /** A group just created or joined, whose study we offer to put in the calendar. */
   const [calendarPrompt, setCalendarPrompt] = useState<string | null>(null);
+  const [justGranted, setJustGranted] = useState(false);
 
   if (!groups) return <section className="card"><p>{t.groupsUnavailable}</p></section>;
   if (!sync.connected || status.state === 'needsReconnect') {
@@ -37,6 +39,20 @@ export function GroupsView({ joinFile, onJoinHandled, onOpenSettings }: Props) {
         </button>
       </section>
     );
+  }
+
+  if (!sync.hasGroupAccess() && !justGranted) {
+    const title = joinFile ? t.joinTitle : t.navGroups;
+    // Only a fresh token says whether access was granted; until then (offline, mid-sync) don't ask.
+    if (status.state !== 'synced') {
+      return (
+        <section className="card">
+          <h2>{title}</h2>
+          <p className="muted">{t.groupsWaitingForDrive}</p>
+        </section>
+      );
+    }
+    return <GroupAccessCard title={title} onGranted={() => setJustGranted(true)} />;
   }
 
   const list = groups.groups();
@@ -64,6 +80,41 @@ export function GroupsView({ joinFile, onJoinHandled, onOpenSettings }: Props) {
         <GroupCard key={g.id} group={g} />
       ))}
     </div>
+  );
+}
+
+/** Explains, before Google asks, why groups need the group-files permission. */
+function GroupAccessCard({ title, onGranted }: { title: string; onGranted: () => void }) {
+  const { t } = useLocale();
+  const { sync } = useServices();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const allow = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (await sync.requestGroupAccess()) onGranted();
+      else setError(t.groupsAccessDenied);
+    } catch (err) {
+      setError(err instanceof AuthRequiredError ? t.groupsAccessDenied : err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="card">
+      <h2>{title}</h2>
+      <p>
+        <strong>{t.groupsAccessTitle}</strong>
+      </p>
+      <p>{t.groupsAccessExplain}</p>
+      {error && <p className="error">{error}</p>}
+      <button className="btn primary" onClick={() => void allow()} disabled={busy}>
+        {t.groupsAccessButton}
+      </button>
+    </section>
   );
 }
 

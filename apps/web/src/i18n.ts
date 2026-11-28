@@ -89,6 +89,15 @@ const en = {
   navGroups: 'Groups',
   groupsNeedDrive: 'Study groups are shared through Google Drive. Connect Google Drive in Settings to create or join one.',
   groupsUnavailable: 'Study groups need Google Drive, which is not configured in this build.',
+  groupsAccessTitle: 'Groups need one more permission',
+  groupsAccessExplain:
+    'A group is a file in the Google Drive of the person who created it, shared with its members. To create or join one, Google will ask you to let Az Kavanu see and edit only the Drive files it creates or that you open with it ("See, edit, create, and delete only the specific Google Drive files you use with this app"). It still cannot see any other file in your Drive.',
+  groupsAccessButton: 'Allow access for groups',
+  groupsWaitingForDrive: 'Connecting to Google Drive…',
+  driveConnectExplain:
+    'Google will show two permissions. Tick both (or "Select all"): the first lets Az Kavanu keep your data in a hidden folder in your Drive so your devices stay in step; the second is only for study groups, and lets it see just the group files it creates or that you open with it. It cannot see any other file in your Drive.',
+  groupsAccessDenied:
+    'Google did not grant access to group files. Try again and tick "only the specific Google Drive files you use with this app".',
   noGroupsYet: 'You are not in any study group yet.',
   newGroup: 'New group',
   groupName: 'Group name',
@@ -355,6 +364,15 @@ const he: Strings = {
   navGroups: 'קבוצות',
   groupsNeedDrive: 'קבוצות לימוד משותפות דרך Google Drive. יש להתחבר ל־Google Drive בהגדרות כדי ליצור קבוצה או להצטרף.',
   groupsUnavailable: 'קבוצות לימוד דורשות Google Drive, שאינו מוגדר בגרסה זו.',
+  groupsAccessTitle: 'לקבוצות צריך הרשאה נוספת',
+  groupsAccessExplain:
+    'קבוצה היא קובץ ב־Google Drive של מי שיצר אותה, משותף עם חבריה. כדי ליצור קבוצה או להצטרף, Google תבקש לאשר לאז קבענו לראות ולערוך רק את הקבצים ב־Drive שהיא יוצרת או שפתחת באמצעותה („See, edit, create, and delete only the specific Google Drive files you use with this app”). היא עדיין לא יכולה לראות שום קובץ אחר ב־Drive שלך.',
+  groupsAccessButton: 'אישור גישה לקבוצות',
+  groupsWaitingForDrive: 'מתחבר ל־Google Drive…',
+  driveConnectExplain:
+    'Google תציג שתי הרשאות. יש לסמן את שתיהן (או „Select all”): הראשונה מאפשרת לאז קבענו לשמור את הנתונים בתיקייה נסתרת ב־Drive שלך כדי שהמכשירים שלך יישארו מעודכנים; השנייה נחוצה רק לקבוצות לימוד, ומאפשרת לה לראות רק את קבצי הקבוצות שהיא יוצרת או שפתחת באמצעותה. היא לא יכולה לראות שום קובץ אחר ב־Drive שלך.',
+  groupsAccessDenied:
+    'Google לא אישרה גישה לקבצי הקבוצות. אפשר לנסות שוב ולסמן את „only the specific Google Drive files you use with this app”.',
   noGroupsYet: 'עדיין אינך חבר באף קבוצת לימוד.',
   newGroup: 'קבוצה חדשה',
   groupName: 'שם הקבוצה',

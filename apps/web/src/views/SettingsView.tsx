@@ -68,6 +68,9 @@ export function SettingsView() {
             {docErrors.some((e) => e.needsClientUpdate) ? t.driveNeedsUpdate : t.driveDocErrors(docErrors.length)}
           </p>
         )}
+        {(status.state === 'disconnected' || status.state === 'needsReconnect') && (
+          <p className="muted small">{t.driveConnectExplain}</p>
+        )}
         <div className="actions">
           {status.state === 'disconnected' && (
             <button className="btn primary" onClick={() => void sync.connect()}>

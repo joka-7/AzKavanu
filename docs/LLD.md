@@ -138,12 +138,17 @@ binds the local replica to the Drive account (`meta:account`) and stops with
 `accountMismatch` if a different account connects, so two people's data never merge.
 
 Tokens come from an `AccessTokenSource` (`getAccessToken(interactive)`, `invalidate`,
-`signOut`), chosen in `createAuth`:
+`signOut`, `hasGroupAccess`, `requestGroupAccess`), chosen in `createAuth`. A token that does
+not carry `SYNC_SCOPE` (`drive.appdata`) is refused on both platforms. `SyncController.syncNow`
+runs `GroupManager.sync` only when the grant includes `GROUP_SCOPE` (`drive.file`); otherwise the
+Groups screen shows `GroupAccessCard`, which explains the permission and asks for it again (only
+once a sync has succeeded, so an unknown grant is never mistaken for a missing one). Settings
+explains both permissions before connecting.
 
 | Source | Platform | Behaviour |
 |---|---|---|
-| `GoogleAuth` | Browser | Google Identity Services' token model: tokens of about an hour, in memory only, renewed silently when Google allows it |
-| `NativeGoogleAuth` | Android | `@joka-07/capacitor-auth` over Credential Manager, asking for `drive.appdata`, `drive.file`, `email` and `profile`. Android renews a granted token without the user, 5 s before expiry; if the grant was removed, even a silent renewal shows Google's consent screen. Network and token-check failures stay ordinary errors |
+| `GoogleAuth` | Browser | Google Identity Services' token model: tokens of about an hour, in memory only, renewed silently when Google allows it. Connecting asks for `drive.appdata` and `drive.file`; a silent renewal asks only for what was granted. Google adds earlier grants to each token, so `hasGroupAccess` reads the token's `scope` |
+| `NativeGoogleAuth` | Android | `@joka-07/capacitor-auth` over Credential Manager, asking for `drive.appdata`, `drive.file`, `email` and `profile` at connect (the sign-in plugin keeps one scope list for every renewal). What was granted is read from Google's tokeninfo for each new token. Android renews a granted token without the user, 5 s before expiry; if the grant was removed, even a silent renewal shows Google's consent screen. Network and token-check failures stay ordinary errors |
 
 Both raise `AuthRequiredError` when Google needs the user again, which becomes
 `needsReconnect`. A 401 from Drive also raises `AuthRequiredError`; other failures raise
