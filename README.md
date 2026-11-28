@@ -102,7 +102,7 @@ cd android && ./gradlew assembleDebug
 Without configuration the app runs in local-only mode. To enable sync:
 
 1. In Google Cloud Console, create a project and enable the **Google Drive API**.
-2. Configure the OAuth consent screen with the scopes `https://www.googleapis.com/auth/drive.appdata` and `https://www.googleapis.com/auth/drive.file`. The app asks for the first when Drive is connected and the second only when someone opens groups. Use the deployed `privacy.html` (`https://kavanu-yahad.vercel.app/privacy.html`) as the privacy policy link, and set the app to *In production*: in *Testing*, sign-ins expire after 7 days.
+2. Configure the OAuth consent screen with the scopes `https://www.googleapis.com/auth/drive.appdata` and `https://www.googleapis.com/auth/drive.file`. The website asks for the first when Drive is connected and the second only when someone opens groups; the Android app asks for both at connect. Use the deployed `privacy.html` (`https://kavanu-yahad.vercel.app/privacy.html`) as the privacy policy link, and set the app to *In production*: in *Testing*, sign-ins expire after 7 days.
 3. Create an OAuth client ID of type **Web application** and add your origins (for example `http://localhost:5173`) under *Authorized JavaScript origins*.
 4. Copy `apps/web/.env.example` to `apps/web/.env.local` and set `VITE_GOOGLE_CLIENT_ID`.
 

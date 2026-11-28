@@ -138,15 +138,16 @@ binds the local replica to the Drive account (`meta:account`) and stops with
 `accountMismatch` if a different account connects, so two people's data never merge.
 
 Tokens come from an `AccessTokenSource` (`getAccessToken(interactive)`, `invalidate`,
-`signOut`, `hasGroupAccess`, `requestGroupAccess`), chosen in `createAuth`. Connecting asks
-only for `SYNC_SCOPE` (`drive.appdata`). `GROUP_SCOPE` (`drive.file`) is asked for when the user
-taps the button on the Groups screen's explanation card (`GroupAccessCard`), and
-`SyncController.syncNow` runs `GroupManager.sync` only once it is granted.
+`signOut`, `hasGroupAccess`, `requestGroupAccess`), chosen in `createAuth`. A token that does
+not carry `SYNC_SCOPE` (`drive.appdata`) is refused on both platforms. `SyncController.syncNow`
+runs `GroupManager.sync` only when the grant includes `GROUP_SCOPE` (`drive.file`); otherwise the
+Groups screen shows `GroupAccessCard`, which explains the permission and asks for it (only once a
+sync has succeeded, so an unknown grant is never mistaken for a missing one).
 
 | Source | Platform | Behaviour |
 |---|---|---|
-| `GoogleAuth` | Browser | Google Identity Services' token model: tokens of about an hour, in memory only, renewed silently when Google allows it. Google adds earlier grants to each token, so `hasGroupAccess` reads the token's `scope` |
-| `NativeGoogleAuth` | Android | `@joka-07/capacitor-auth` over Credential Manager, asking for `drive.appdata`, `email` and `profile`, plus `drive.file` once granted. Android returns exactly the scopes asked for, so the grant is remembered in `localStorage` (`kavanu.groupAccess`, cleared on sign-out) and checked against Google's tokeninfo when given. Android renews a granted token without the user, 5 s before expiry; if the grant was removed, even a silent renewal shows Google's consent screen. Network and token-check failures stay ordinary errors |
+| `GoogleAuth` | Browser | Google Identity Services' token model: tokens of about an hour, in memory only, renewed silently when Google allows it. Connecting asks only for `drive.appdata`; `drive.file` is asked for from `GroupAccessCard`. Google adds earlier grants to each token, so `hasGroupAccess` reads the token's `scope` |
+| `NativeGoogleAuth` | Android | `@joka-07/capacitor-auth` over Credential Manager, asking for `drive.appdata`, `drive.file`, `email` and `profile` at connect (the sign-in plugin keeps one scope list for every renewal, so a scope added later would change what silent renewals ask for). What was granted is read from Google's tokeninfo for each new token; Settings explains both permissions before connecting. Android renews a granted token without the user, 5 s before expiry; if the grant was removed, even a silent renewal shows Google's consent screen. Network and token-check failures stay ordinary errors |
 
 Both raise `AuthRequiredError` when Google needs the user again, which becomes
 `needsReconnect`. A 401 from Drive also raises `AuthRequiredError`; other failures raise

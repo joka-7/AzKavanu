@@ -2,6 +2,7 @@ import { GroupFullError, toISODate, type GroupPreview, type GroupView } from '@k
 import { useState } from 'react';
 import { useGroups, useLocale, useRepo, useServices, useSyncStatus } from '../context';
 import { describeSchedule } from '../describe';
+import { AuthRequiredError } from '../platform/googleAuth';
 import { DriveHttpError } from '../platform/googleDrive';
 import { isNative } from '../platform/notifications';
 import { EventPanel } from './EventPanel';
@@ -41,7 +42,17 @@ export function GroupsView({ joinFile, onJoinHandled, onOpenSettings }: Props) {
   }
 
   if (!sync.hasGroupAccess() && !justGranted) {
-    return <GroupAccessCard title={joinFile ? t.joinTitle : t.navGroups} onGranted={() => setJustGranted(true)} />;
+    const title = joinFile ? t.joinTitle : t.navGroups;
+    // Only a fresh token says whether access was granted; until then (offline, mid-sync) don't ask.
+    if (status.state !== 'synced') {
+      return (
+        <section className="card">
+          <h2>{title}</h2>
+          <p className="muted">{t.groupsWaitingForDrive}</p>
+        </section>
+      );
+    }
+    return <GroupAccessCard title={title} onGranted={() => setJustGranted(true)} />;
   }
 
   const list = groups.groups();
@@ -86,7 +97,7 @@ function GroupAccessCard({ title, onGranted }: { title: string; onGranted: () =>
       if (await sync.requestGroupAccess()) onGranted();
       else setError(t.groupsAccessDenied);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(err instanceof AuthRequiredError ? t.groupsAccessDenied : err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }

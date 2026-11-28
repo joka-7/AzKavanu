@@ -149,7 +149,9 @@ export class SyncController {
   async requestGroupAccess(): Promise<boolean> {
     if (!this.auth) return false;
     const granted = await this.auth.requestGroupAccess();
-    if (granted) await this.syncNow();
+    // A background sync may be running; let it finish, then sync again with the groups.
+    if (granted && this.status.state === 'syncing') this.schedule();
+    else if (granted) await this.syncNow();
     return granted;
   }
 

@@ -112,9 +112,13 @@ export class GoogleAuth implements AccessTokenSource {
         scope,
         callback: (r) => {
           if (r.error || !r.access_token) return reject(new AuthRequiredError(r.error));
+          const granted = new Set((r.scope ?? '').split(' '));
+          // Google's consent screen lets the user untick a permission; never swap a working
+          // token for one that can no longer reach the app folder.
+          if (!granted.has(SYNC_SCOPE)) return reject(new AuthRequiredError('Google did not grant access to the app folder'));
           this.token = r.access_token;
           this.expiresAt = Date.now() + (r.expires_in ?? 3600) * 1000;
-          this.granted = new Set((r.scope ?? '').split(' '));
+          this.granted = granted;
           resolve(r.access_token);
         },
         error_callback: (e) => reject(new AuthRequiredError(e.type)),

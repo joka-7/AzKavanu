@@ -3,11 +3,6 @@ import { AuthRequiredError, GROUP_SCOPE, SYNC_SCOPE, type AccessTokenSource } fr
 
 /** Renew just before expiry: with a wider margin Android hands back the same, nearly expired token. */
 const RENEW_MARGIN_MS = 5_000;
-/**
- * Android returns a token for exactly the scopes asked for, so the app remembers on this
- * device that the user allowed group files and keeps asking for them. Not a secret.
- */
-const GROUP_ACCESS_FLAG = 'kavanu.groupAccess';
 type Native = ReturnType<typeof createNativeGoogleAuth>;
 
 /**
@@ -15,35 +10,33 @@ type Native = ReturnType<typeof createNativeGoogleAuth>;
  * Android renews a granted token without the user, but if the grant was removed
  * (in the Google account, say) the plugin shows Google's consent screen even on a
  * "silent" renewal; there is no way to ask it not to.
+ *
+ * Unlike the web, Android asks for the group-files scope at connect too: the sign-in
+ * plugin keeps one scope list for every later renewal, so adding a scope afterwards
+ * would change what each silent renewal asks for, and a refused group grant could
+ * then break ordinary sync. What was actually granted is read from Google's tokeninfo.
  */
 export class NativeGoogleAuth implements AccessTokenSource {
-  private native: Native;
+  private readonly native: Native;
   private token: string | null = null;
   private expiresAt = 0;
+  /** Whether the current Google grant includes GROUP_SCOPE; unknown until the first token. */
+  private groupAccess = false;
 
-  constructor(private readonly webClientId: string) {
-    this.native = this.nativeFor(this.hasGroupAccess());
+  constructor(webClientId: string) {
+    const scopes = [...new Set([...DEFAULT_SCOPES, SYNC_SCOPE, GROUP_SCOPE])];
+    this.native = createNativeGoogleAuth({ webClientId, fetchImpl: fetch.bind(globalThis), scopes });
   }
 
   hasGroupAccess(): boolean {
-    return localStorage.getItem(GROUP_ACCESS_FLAG) === '1';
+    return this.groupAccess;
   }
 
+  /** Shows Google's consent again, where the user can tick the group-files box they left empty. */
   async requestGroupAccess(): Promise<boolean> {
-    const native = this.nativeFor(true);
-    const granted = await native.requestToken({ interactive: true });
-    // Google's consent screen lets the user untick a permission, so check what was granted.
-    if (!granted || !(await grantedScopes(granted.access_token)).includes(GROUP_SCOPE)) return false;
-    localStorage.setItem(GROUP_ACCESS_FLAG, '1');
-    this.native = native;
-    this.token = granted.access_token;
-    this.expiresAt = Date.now() + granted.expires_in * 1000;
-    return true;
-  }
-
-  private nativeFor(withGroups: boolean): Native {
-    const scopes = [...new Set([...DEFAULT_SCOPES, SYNC_SCOPE, ...(withGroups ? [GROUP_SCOPE] : [])])];
-    return createNativeGoogleAuth({ webClientId: this.webClientId, fetchImpl: fetch.bind(globalThis), scopes });
+    this.token = null;
+    await this.getAccessToken(true);
+    return this.groupAccess;
   }
 
   invalidate(): void {
@@ -54,6 +47,10 @@ export class NativeGoogleAuth implements AccessTokenSource {
     if (this.token && Date.now() < this.expiresAt - RENEW_MARGIN_MS) return this.token;
     const granted = await this.request(interactive);
     if (!granted) throw new AuthRequiredError('Google did not grant Drive access');
+    // Google's consent screen lets the user untick a permission, so check what was granted.
+    const scopes = await grantedScopes(granted.access_token);
+    if (!scopes.includes(SYNC_SCOPE)) throw new AuthRequiredError('Google did not grant access to the app folder');
+    this.groupAccess = scopes.includes(GROUP_SCOPE);
     this.token = granted.access_token;
     this.expiresAt = Date.now() + granted.expires_in * 1000;
     return granted.access_token;
@@ -61,7 +58,7 @@ export class NativeGoogleAuth implements AccessTokenSource {
 
   async signOut(): Promise<void> {
     this.token = null;
-    localStorage.removeItem(GROUP_ACCESS_FLAG);
+    this.groupAccess = false;
     await this.native.signOut();
   }
 
