@@ -124,7 +124,7 @@ export class SyncController {
 
       const revision = this.repo.getRevision();
       const report = await this.engine.sync();
-      await this.groups?.sync();
+      if (this.auth?.hasGroupAccess()) await this.groups?.sync();
       this.lastRevisionSynced = report.pulled.length ? this.repo.getRevision() : revision;
       this.set({ state: 'synced', at: Date.now(), report });
       if (this.repo.getRevision() !== this.lastRevisionSynced) this.schedule();
@@ -136,6 +136,21 @@ export class SyncController {
         this.set({ state: 'error', message: err instanceof Error ? err.message : String(err) });
       }
     }
+  }
+
+  hasGroupAccess(): boolean {
+    return this.auth?.hasGroupAccess() ?? false;
+  }
+
+  /**
+   * Call from a click handler: asks Google for the group-files permission, then syncs
+   * the groups. Resolves to whether the user granted it.
+   */
+  async requestGroupAccess(): Promise<boolean> {
+    if (!this.auth) return false;
+    const granted = await this.auth.requestGroupAccess();
+    if (granted) await this.syncNow();
+    return granted;
   }
 
   /** A current access token, for Google UI components such as the Picker. */

@@ -25,6 +25,7 @@ export function GroupsView({ joinFile, onJoinHandled, onOpenSettings }: Props) {
   const [creating, setCreating] = useState(false);
   /** A group just created or joined, whose study we offer to put in the calendar. */
   const [calendarPrompt, setCalendarPrompt] = useState<string | null>(null);
+  const [justGranted, setJustGranted] = useState(false);
 
   if (!groups) return <section className="card"><p>{t.groupsUnavailable}</p></section>;
   if (!sync.connected || status.state === 'needsReconnect') {
@@ -37,6 +38,10 @@ export function GroupsView({ joinFile, onJoinHandled, onOpenSettings }: Props) {
         </button>
       </section>
     );
+  }
+
+  if (!sync.hasGroupAccess() && !justGranted) {
+    return <GroupAccessCard title={joinFile ? t.joinTitle : t.navGroups} onGranted={() => setJustGranted(true)} />;
   }
 
   const list = groups.groups();
@@ -64,6 +69,41 @@ export function GroupsView({ joinFile, onJoinHandled, onOpenSettings }: Props) {
         <GroupCard key={g.id} group={g} />
       ))}
     </div>
+  );
+}
+
+/** Explains, before Google asks, why groups need the group-files permission. */
+function GroupAccessCard({ title, onGranted }: { title: string; onGranted: () => void }) {
+  const { t } = useLocale();
+  const { sync } = useServices();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const allow = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (await sync.requestGroupAccess()) onGranted();
+      else setError(t.groupsAccessDenied);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="card">
+      <h2>{title}</h2>
+      <p>
+        <strong>{t.groupsAccessTitle}</strong>
+      </p>
+      <p>{t.groupsAccessExplain}</p>
+      {error && <p className="error">{error}</p>}
+      <button className="btn primary" onClick={() => void allow()} disabled={busy}>
+        {t.groupsAccessButton}
+      </button>
+    </section>
   );
 }
 

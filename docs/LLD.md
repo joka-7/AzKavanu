@@ -138,12 +138,15 @@ binds the local replica to the Drive account (`meta:account`) and stops with
 `accountMismatch` if a different account connects, so two people's data never merge.
 
 Tokens come from an `AccessTokenSource` (`getAccessToken(interactive)`, `invalidate`,
-`signOut`), chosen in `createAuth`:
+`signOut`, `hasGroupAccess`, `requestGroupAccess`), chosen in `createAuth`. Connecting asks
+only for `SYNC_SCOPE` (`drive.appdata`). `GROUP_SCOPE` (`drive.file`) is asked for when the user
+taps the button on the Groups screen's explanation card (`GroupAccessCard`), and
+`SyncController.syncNow` runs `GroupManager.sync` only once it is granted.
 
 | Source | Platform | Behaviour |
 |---|---|---|
-| `GoogleAuth` | Browser | Google Identity Services' token model: tokens of about an hour, in memory only, renewed silently when Google allows it |
-| `NativeGoogleAuth` | Android | `@joka-07/capacitor-auth` over Credential Manager, asking for `drive.appdata`, `drive.file`, `email` and `profile`. Android renews a granted token without the user, 5 s before expiry; if the grant was removed, even a silent renewal shows Google's consent screen. Network and token-check failures stay ordinary errors |
+| `GoogleAuth` | Browser | Google Identity Services' token model: tokens of about an hour, in memory only, renewed silently when Google allows it. Google adds earlier grants to each token, so `hasGroupAccess` reads the token's `scope` |
+| `NativeGoogleAuth` | Android | `@joka-07/capacitor-auth` over Credential Manager, asking for `drive.appdata`, `email` and `profile`, plus `drive.file` once granted. Android returns exactly the scopes asked for, so the grant is remembered in `localStorage` (`kavanu.groupAccess`, cleared on sign-out) and checked against Google's tokeninfo when given. Android renews a granted token without the user, 5 s before expiry; if the grant was removed, even a silent renewal shows Google's consent screen. Network and token-check failures stay ordinary errors |
 
 Both raise `AuthRequiredError` when Google needs the user again, which becomes
 `needsReconnect`. A 401 from Drive also raises `AuthRequiredError`; other failures raise

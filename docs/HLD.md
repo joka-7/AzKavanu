@@ -26,7 +26,7 @@ to open, see [`STRUCTURE.md`](STRUCTURE.md); for per-module contracts, see [`LLD
 
 - No backend: no server, database or analytics of ours ever holds user data.
 - Works offline; the UI never waits on the network.
-- Only non-sensitive Google scopes (`drive.appdata`, `drive.file`).
+- Only non-sensitive Google scopes: `drive.appdata` to sync, and `drive.file` only once the user opens groups.
 - Two devices editing at the same time never lose a change.
 
 ## Components
@@ -76,7 +76,7 @@ sequenceDiagram
   E->>D: download changed documents
   E->>R: validate, merge per record, apply
   E->>D: upload merged state where remote was stale
-  C->>C: GroupManager.sync() republishes my group sections
+  C->>C: GroupManager.sync() republishes my group sections (once group access is granted)
 ```
 
 Sync also runs on start, on regaining connectivity, when the tab becomes visible, and every
