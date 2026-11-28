@@ -4,10 +4,7 @@
  */
 /** The hidden per-app folder: everything sync needs. */
 export const SYNC_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
-/**
- * Only files this app created or the user picked: the shared group files. Asked for
- * separately, the first time someone opens groups, so connecting Drive shows one permission.
- */
+/** Only files this app created or the user picked: the shared group files. */
 export const GROUP_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
 interface TokenResponse {
@@ -90,9 +87,10 @@ export class GoogleAuth implements AccessTokenSource {
    */
   async getAccessToken(interactive: boolean): Promise<string> {
     if (this.token && Date.now() < this.expiresAt - 60_000) return this.token;
-    // Google includes scopes granted earlier (such as GROUP_SCOPE) in the token it returns.
-    void interactive;
-    return this.request(SYNC_SCOPE);
+    // Connecting asks for both scopes. A silent renewal asks only for what was granted, so a
+    // user who left the group box empty is not shown Google's consent again; Google adds
+    // earlier grants to the token either way.
+    return this.request(interactive || this.hasGroupAccess() ? `${SYNC_SCOPE} ${GROUP_SCOPE}` : SYNC_SCOPE);
   }
 
   hasGroupAccess(): boolean {

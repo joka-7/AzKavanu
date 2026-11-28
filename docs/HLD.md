@@ -26,7 +26,7 @@ to open, see [`STRUCTURE.md`](STRUCTURE.md); for per-module contracts, see [`LLD
 
 - No backend: no server, database or analytics of ours ever holds user data.
 - Works offline; the UI never waits on the network.
-- Only non-sensitive Google scopes: `drive.appdata` to sync, and `drive.file` for groups (asked for on the website only when the user opens groups).
+- Only non-sensitive Google scopes, both asked for at connect: `drive.appdata` to sync, and `drive.file` for groups.
 - Two devices editing at the same time never lose a change.
 
 ## Components

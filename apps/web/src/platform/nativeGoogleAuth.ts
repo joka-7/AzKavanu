@@ -11,10 +11,9 @@ type Native = ReturnType<typeof createNativeGoogleAuth>;
  * (in the Google account, say) the plugin shows Google's consent screen even on a
  * "silent" renewal; there is no way to ask it not to.
  *
- * Unlike the web, Android asks for the group-files scope at connect too: the sign-in
- * plugin keeps one scope list for every later renewal, so adding a scope afterwards
- * would change what each silent renewal asks for, and a refused group grant could
- * then break ordinary sync. What was actually granted is read from Google's tokeninfo.
+ * It asks for both scopes at connect, as the web does. The sign-in plugin keeps that one
+ * scope list for every later renewal, so the list never changes after connecting. What was
+ * actually granted is read from Google's tokeninfo.
  */
 export class NativeGoogleAuth implements AccessTokenSource {
   private readonly native: Native;
